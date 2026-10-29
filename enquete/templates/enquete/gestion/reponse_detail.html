@@ -1,0 +1,35 @@
+{% extends "enquete/gestion/_base.html" %}
+{% block titre %}{{ reponse.epn.nom }}{% endblock %}
+{% block page %}
+<div class="titre-page">
+  <div><a href="{% url 'gestion:reponses' %}?campagne={{ reponse.campagne.pk }}" class="petit">← Réponses</a><h1>{{ reponse.epn.nom }}</h1><p class="discret">{{ reponse.campagne.nom }} · {{ reponse.epn.tutelle }} · <span class="pastille {{ reponse.statut }}">{{ reponse.get_statut_display }}</span></p></div>
+  <div class="actions">
+    {% if reponse.est_soumise %}
+      <form method="post" action="{% url 'gestion:reponse_rouvrir' reponse.pk %}" class="en-ligne" onsubmit="return confirm('Rouvrir la saisie pour permettre une correction ?')">{% csrf_token %}<button class="btn">Rouvrir pour correction</button></form>
+    {% else %}
+      <form method="post" action="{% url 'gestion:relancer' reponse.pk %}" class="en-ligne">{% csrf_token %}<input type="hidden" name="suivant" value="{{ request.get_full_path }}"><button class="btn">Relancer par e-mail</button></form>
+      <form method="post" action="{% url 'gestion:reinviter' reponse.pk %}" class="en-ligne">{% csrf_token %}<button class="btn">Renvoyer l'invitation</button></form>
+    {% endif %}
+    <button type="button" class="btn" onclick="window.print()">Imprimer</button>
+  </div>
+</div>
+<div class="ligne">
+  <div class="large" style="display: flex; flex-direction: column; gap: 16px">
+    {% for bloc in recap %}
+    <section class="carte"><div style="display: flex; justify-content: space-between; gap: 12px"><h2>{{ bloc.module.code }}. {{ bloc.module.titre }}</h2>{% if not bloc.fait %}<span class="pastille en_cours">Incomplet</span>{% endif %}</div>
+      <dl class="recap">{% for q, valeur in bloc.lignes %}<dt>{{ q.code }} · {{ q.libelle }}</dt><dd>{% if valeur == "" or valeur is None %}<span class="discret" style="font-weight: 400">—</span>{% elif q.type == "montant" or q.type == "entier" %}{{ valeur|floatformat:"0g" }}{% elif q.type == "pourcentage" %}{{ valeur }} %{% else %}{{ valeur }}{% endif %}</dd>{% endfor %}</dl>
+    </section>
+    {% endfor %}
+  </div>
+  <aside class="cote" style="display: flex; flex-direction: column; gap: 16px">
+    <section class="carte"><h2>Répondant</h2>
+      {% if reponse.nom %}<p><strong>{{ reponse.repondant }}</strong><br>{{ reponse.fonction }}</p><p><a href="mailto:{{ reponse.email }}">{{ reponse.email }}</a><br>{{ reponse.telephone }}</p>{% else %}<p class="discret">Pas encore identifié.</p>{% endif %}
+      <p class="discret petit">Point focal : {{ reponse.epn.email_contact }}</p>
+    </section>
+    <section class="carte"><h2>Lien personnel</h2><input class="saisie" readonly value="{{ reponse.lien }}" aria-label="Lien personnel de l'EPN" onclick="this.select()"><p class="discret petit">À transmettre uniquement à l'EPN concerné.</p></section>
+    <section class="carte"><h2>Historique des e-mails</h2>
+      {% for e in envois %}<div style="border-top: 1px solid #EEF1F5; padding-top: 8px"><strong>{{ e.get_type_display }}</strong> · {{ e.date|date:"d/m/Y H:i" }}{% if not e.succes %} · <span style="color: var(--erreur); font-weight: 600">échec</span>{% endif %}<br><span class="discret petit">{{ e.destinataires }}{% if e.par %} · par {{ e.par }}{% endif %}</span></div>{% empty %}<p class="discret">Aucun envoi.</p>{% endfor %}
+    </section>
+  </aside>
+</div>
+{% endblock %}

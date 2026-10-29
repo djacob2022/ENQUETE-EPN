@@ -1,0 +1,31 @@
+{% extends "enquete/public/_base.html" %}
+{% block titre %}Récapitulatif{% endblock %}
+{% block page %}
+<main class="etroit">
+  <div class="titre-page"><div>
+    <a href="{% url 'public:module' reponse.jeton 'A' %}" class="petit">← Retour au questionnaire</a>
+    <h1>Récapitulatif avant envoi</h1>
+    <p class="discret">{{ reponse.epn.nom }} · {{ reponse.campagne.nom }}</p>
+  </div></div>
+  {% include "enquete/_messages.html" %}
+  {% if manquants %}
+    <div class="message warning">Rubriques à compléter avant l'envoi : {% for m in manquants %}<a href="{% url 'public:module' reponse.jeton m.code %}">{{ m.code }}. {{ m.titre }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</div>
+  {% else %}
+    <div class="message success">Toutes les rubriques sont complètes. Relisez puis envoyez.</div>
+  {% endif %}
+  {% include "enquete/public/_recap.html" with modifiable=True %}
+  <form method="post" class="carte">
+    {% csrf_token %}
+    <h2>Certification et envoi</h2>
+    <label style="display: flex; gap: 12px; align-items: flex-start; cursor: pointer">
+      <input type="checkbox" name="certification" required style="width: 20px; height: 20px; margin-top: 2px; accent-color: var(--primaire)">
+      <span>Je soussigné(e), <strong>{{ reponse.repondant }}</strong>{% if reponse.fonction %}, {{ reponse.fonction }}{% endif %}, certifie l'exactitude et l'exhaustivité des informations transmises pour {{ reponse.epn.nom }}.</span>
+    </label>
+    {% if form.certification.errors %}<p class="message error">Cochez la case de certification pour envoyer.</p>{% endif %}
+    <div class="actions" style="justify-content: flex-end; border-top: 1px solid var(--bordure); padding-top: 16px">
+      <button type="submit" class="btn primaire" {% if manquants %}disabled aria-disabled="true" style="opacity: .5; cursor: not-allowed"{% endif %}>Envoyer mes réponses</button>
+    </div>
+    <p class="discret petit">Après l'envoi, les réponses ne sont plus modifiables, sauf réouverture par l'administration. Un accusé de réception est envoyé par e-mail.</p>
+  </form>
+</main>
+{% endblock %}

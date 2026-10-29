@@ -1,0 +1,11 @@
+<div class="champ{% if champ.errors %} en-erreur{% endif %}{% if plein %} plein{% endif %}">
+  {% if champ.field.widget.input_type == 'radio' or champ.field.widget.input_type == 'checkbox' %}
+    <span class="etiquette" id="lib-{{ champ.auto_id }}">{{ champ.label }}{% if champ.field.required %} <span class="requis" aria-hidden="true">*</span>{% endif %}</span>
+    <div class="choix" role="group" aria-labelledby="lib-{{ champ.auto_id }}">{% for option in champ %}<label>{{ option.tag }} {{ option.choice_label }}</label>{% endfor %}</div>
+  {% else %}
+    <label for="{{ champ.id_for_label }}">{{ champ.label }}{% if champ.field.required %} <span class="requis" aria-hidden="true">*</span>{% endif %}</label>
+    {{ champ }}
+  {% endif %}
+  {% if champ.help_text %}<span class="aide">{{ champ.help_text }}</span>{% endif %}
+  {% if champ.errors %}<ul class="erreurs" role="alert">{% for e in champ.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+</div>

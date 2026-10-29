@@ -1,0 +1,10 @@
+{% for bloc in recap %}
+<section class="carte">
+  <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+    <h2>{{ bloc.module.code }}. {{ bloc.module.titre }}</h2>
+    {% if modifiable %}{% if bloc.fait %}<span class="pastille soumis">Complet</span>{% else %}<span class="pastille en_cours">À compléter</span>{% endif %}
+    <a href="{% url 'public:module' reponse.jeton bloc.module.code %}" class="btn petit">Modifier</a>{% endif %}
+  </div>
+  <dl class="recap">{% for q, valeur in bloc.lignes %}<dt>{{ q.code }} · {{ q.libelle }}</dt><dd>{% if valeur == "" or valeur is None %}<span class="discret" style="font-weight: 400">—</span>{% elif q.type == "montant" or q.type == "entier" %}{{ valeur|floatformat:"0g" }}{% elif q.type == "pourcentage" %}{{ valeur }} %{% else %}{{ valeur }}{% endif %}</dd>{% endfor %}</dl>
+</section>
+{% endfor %}

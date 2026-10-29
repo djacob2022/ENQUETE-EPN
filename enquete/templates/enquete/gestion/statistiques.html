@@ -1,0 +1,71 @@
+{% extends "enquete/gestion/_base.html" %}
+{% block titre %}Statistiques{% endblock %}
+{% block page %}
+<div class="titre-page">
+  <div><h1>Statistiques</h1><p class="discret">{{ campagne.nom }} · calculées sur {{ n }} réponse(s) {% if f.toutes == "1" %}(y compris en cours){% else %}envoyée(s){% endif %}</p></div>
+  <div class="actions">
+    <a href="?{{ request.GET.urlencode }}&toutes={% if f.toutes == '1' %}0{% else %}1{% endif %}" class="btn">{% if f.toutes == "1" %}Réponses envoyées seulement{% else %}Inclure les réponses en cours{% endif %}</a>
+    <a href="{% url 'gestion:export' %}?{{ request.GET.urlencode }}" class="btn primaire">Exporter en Excel</a>
+  </div>
+</div>
+{% include "enquete/gestion/_filtres.html" %}
+<div class="grille">
+  {% for i in indicateurs %}<div class="carte kpi"><span class="libelle">{{ i.libelle }}</span><span class="valeur">{% if i.valeur is None %}—{% else %}{{ i.valeur|floatformat:1 }} %{% endif %}</span><span class="discret petit">{{ i.formule }}</span></div>{% endfor %}
+</div>
+{% if historique|length > 1 %}
+<section class="carte"><h2>Évolution du taux de réponse par exercice</h2><div class="graphique" style="height: 220px"><canvas id="g-historique" role="img" aria-label="Taux de réponse par exercice"></canvas></div>{{ historique|json_script:"d-historique" }}</section>
+{% endif %}
+{% for bloc in blocs %}
+<section class="carte">
+  <h2>{{ bloc.module.code }}. {{ bloc.module.titre }}</h2>
+  {% with nums=bloc.questions %}
+  <div class="defilement"><table class="tableau">
+    <thead><tr><th>Variable</th><th class="nombre">n</th><th class="nombre">Somme</th><th class="nombre">Moyenne</th><th class="nombre">Médiane</th><th class="nombre">Min</th><th class="nombre">Max</th><th class="nombre">Écart-type</th></tr></thead>
+    <tbody>{% for item in nums %}{% if item.genre == "numerique" %}{% with s=item.stats %}<tr>
+      <td>{{ item.q.code }} · {{ item.q.libelle }}</td><td class="nombre">{{ s.n }}</td>
+      {% if s.n %}<td class="nombre">{{ s.somme|floatformat:"0g" }}</td><td class="nombre">{{ s.moyenne|floatformat:"1g" }}</td><td class="nombre">{{ s.mediane|floatformat:"1g" }}</td><td class="nombre">{{ s.min|floatformat:"0g" }}</td><td class="nombre">{{ s.max|floatformat:"0g" }}</td><td class="nombre">{{ s.ecart_type|floatformat:"1g" }}</td>
+      {% else %}<td colspan="6" class="discret">Aucune donnée</td>{% endif %}
+    </tr>{% endwith %}{% endif %}{% endfor %}</tbody>
+  </table></div>
+  {% endwith %}
+  <div class="grille" style="--min: 320px">
+    {% for item in bloc.questions %}{% if item.genre == "frequence" %}
+    <div style="border: 1px solid #EEF1F5; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+      <strong style="font-size: 14px">{{ item.q.code }} · {{ item.q.libelle }}</strong>
+      <span class="discret petit">n = {{ item.stats.n }}{% if item.q.type == "choix_multiple" %} · plusieurs réponses possibles{% endif %}</span>
+      <div class="graphique" style="height: {% if item.stats.lignes|length > 3 %}200{% else %}120{% endif %}px"><canvas data-frequence="{{ item.q.code }}" role="img" aria-label="Répartition des réponses à {{ item.q.code }}"></canvas></div>
+      {{ item.stats.lignes|json_script:item.q.code }}
+    </div>
+    {% endif %}{% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function () {
+  if (!window.Chart) return;
+  Chart.defaults.font.family = "'Public Sans', system-ui, sans-serif";
+  document.querySelectorAll('canvas[data-frequence]').forEach(function (c) {
+    const lignes = JSON.parse(document.getElementById(c.dataset.frequence).textContent);
+    new Chart(c, {
+      type: 'bar',
+      data: { labels: lignes.map(l => l.libelle), datasets: [{ data: lignes.map(l => Math.round(l.pourcentage)), backgroundColor: '#1D4E89', borderRadius: 4 }] },
+      options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: x => x.raw + ' % (' + lignes[x.dataIndex].effectif + ')' } } },
+        scales: { x: { min: 0, max: 100, ticks: { callback: v => v + ' %' } }, y: { grid: { display: false } } } }
+    });
+  });
+  const h = document.getElementById('d-historique');
+  if (h) {
+    const d = JSON.parse(h.textContent);
+    new Chart(document.getElementById('g-historique'), {
+      type: 'line',
+      data: { labels: d.map(x => x.libelle), datasets: [{ data: d.map(x => x.taux), borderColor: '#1D4E89', backgroundColor: '#1D4E89', tension: .2 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100, ticks: { callback: v => v + ' %' } } } }
+    });
+  }
+})();
+</script>
+{% endblock %}

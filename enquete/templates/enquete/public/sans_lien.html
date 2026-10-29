@@ -1,0 +1,10 @@
+{% extends "enquete/public/_base.html" %}
+{% block titre %}Accueil{% endblock %}
+{% block page %}
+<main class="etroit" style="max-width: 760px"><div class="carte accent">
+  <h1>Enquête sur les Établissements Publics Nationaux</h1>
+  <p>Pour répondre, utilisez le lien personnel reçu par e-mail par le point focal de votre établissement.</p>
+  <p class="discret">Vous ne trouvez plus le lien ? Contactez l'administration de tutelle, qui peut vous le renvoyer.</p>
+  <a href="{% url 'login' %}" class="btn" style="align-self: flex-start">Espace administrateur</a>
+</div></main>
+{% endblock %}

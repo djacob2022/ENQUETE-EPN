@@ -1,0 +1,10 @@
+{% extends "enquete/public/_base.html" %}
+{% block titre %}Déjà envoyé{% endblock %}
+{% block page %}
+<main class="etroit"><div class="carte accent">
+  <h1>Ce questionnaire a déjà été envoyé.</h1>
+  <p>{{ reponse.epn.nom }} a transmis ses réponses le {{ reponse.date_soumission|date:"j F Y à H:i" }}.</p>
+  <p class="discret">Pour une correction, contactez l'administration de tutelle : elle peut rouvrir la saisie.</p>
+  <a href="{% url 'public:merci' reponse.jeton %}" class="btn" style="align-self: flex-start">Voir le récapitulatif</a>
+</div></main>
+{% endblock %}

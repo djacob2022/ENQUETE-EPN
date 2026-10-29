@@ -1,0 +1,11 @@
+Madame, Monsieur,
+
+Nous accusons réception des réponses de {{ reponse.epn.nom }} pour « {{ campagne.nom }} », envoyées le {{ reponse.date_soumission|date:"j F Y à H:i" }} par {{ reponse.repondant }}.
+
+Vous pouvez consulter le récapitulatif ici :
+{{ reponse.lien }}
+
+Merci pour votre contribution.
+
+Cordialement,
+{{ institution }}

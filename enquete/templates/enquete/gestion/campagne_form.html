@@ -1,0 +1,17 @@
+{% extends "enquete/gestion/_base.html" %}
+{% block titre %}Campagne{% endblock %}
+{% block page %}
+<div class="titre-page"><div><a href="{% url 'gestion:campagnes' %}" class="petit">← Campagnes</a><h1>{% if instance %}Modifier la campagne{% else %}Nouvelle campagne{% endif %}</h1></div></div>
+<form method="post" class="carte" style="max-width: 720px" novalidate>
+  {% csrf_token %}
+  <div class="formulaire-grille">
+    {% include "enquete/_champ.html" with champ=form.nom plein=True %}
+    {% include "enquete/_champ.html" with champ=form.exercice %}
+    <span></span>
+    {% include "enquete/_champ.html" with champ=form.date_ouverture %}
+    {% include "enquete/_champ.html" with champ=form.date_cloture %}
+  </div>
+  <label style="display: flex; gap: 10px; align-items: center; min-height: 44px">{{ form.active }} Campagne active <span class="discret petit">({{ form.active.help_text }})</span></label>
+  <div class="actions" style="justify-content: flex-end"><a href="{% url 'gestion:campagnes' %}" class="btn">Annuler</a><button class="btn primaire">Enregistrer</button></div>
+</form>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "enquete/gestion/_base.html" %}
+{% block titre %}Campagnes{% endblock %}
+{% block page %}
+<div class="titre-page"><div><h1>Campagnes</h1><p class="discret">Une seule campagne active à la fois : celle des liens envoyés aux EPN.</p></div><div class="actions"><a href="{% url 'gestion:campagne_nouvelle' %}" class="btn primaire">+ Nouvelle campagne</a></div></div>
+<section class="carte sans-marge"><div class="defilement"><table class="tableau"><thead><tr><th>Campagne</th><th>Exercice</th><th>Période</th><th>Réponses</th><th>État</th><th></th></tr></thead><tbody>
+{% for c in campagnes %}<tr><td><strong>{{ c.nom }}</strong></td><td>{{ c.exercice }}</td><td>{{ c.date_ouverture|date:"d/m/Y" }} – {{ c.date_cloture|date:"d/m/Y" }}</td><td>{{ c.soumis }} / {{ c.total }}</td><td>{% if c.active %}<span class="pastille soumis">Active</span>{% else %}<span class="pastille invite">Inactive</span>{% endif %}</td><td><a href="{% url 'gestion:campagne_modifier' c.pk %}">Modifier</a> · <a href="{% url 'gestion:tableau_de_bord' %}?campagne={{ c.pk }}">Suivi</a></td></tr>{% empty %}<tr><td colspan="6" class="discret">Aucune campagne.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% endblock %}

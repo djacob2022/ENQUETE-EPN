@@ -1,0 +1,22 @@
+{% extends "enquete/base.html" %}
+{% block titre %}Connexion{% endblock %}
+{% block corps %}
+<div class="connexion">
+  <section class="visuel">
+    <div class="marque" style="flex-grow: 0"><div class="logo" style="background: #fff; color: var(--primaire)" aria-hidden="true">EPN</div><div><strong>ENQUÊTE-EPN</strong><span style="color: #D5E1F0">{{ NOM_INSTITUTION }}</span></div></div>
+    <h1>Les données des Établissements Publics Nationaux, au même endroit.</h1>
+    <p style="color: #E3ECF7; font-size: 17px">Suivi des réponses, relances, exports Excel et statistiques.</p>
+  </section>
+  <section class="formulaire">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div><h2 style="font-size: 26px">Espace administrateur</h2><p class="discret">Les EPN répondent via le lien personnel reçu par e-mail : ils n'ont pas besoin de compte.</p></div>
+      {% if form.non_field_errors %}<div class="message error">Identifiant ou mot de passe incorrect.</div>{% endif %}
+      <div class="champ"><label for="id_username">Identifiant</label><input type="text" name="username" id="id_username" autocomplete="username" required autofocus value="{{ form.username.value|default:'' }}"></div>
+      <div class="champ"><label for="id_password">Mot de passe</label><input type="password" name="password" id="id_password" autocomplete="current-password" required></div>
+      <input type="hidden" name="next" value="{{ next }}">
+      <button class="btn primaire" style="min-height: 48px">Se connecter</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

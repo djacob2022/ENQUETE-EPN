@@ -1,0 +1,70 @@
+{% extends "enquete/gestion/_base.html" %}
+{% block titre %}Tableau de bord{% endblock %}
+{% block page %}
+<div class="titre-page">
+  <div><h1>Tableau de bord</h1><p class="discret">{{ campagne.nom }} · exercice {{ campagne.exercice }} · clôture le {{ campagne.date_cloture|date:"j F Y" }}</p></div>
+  <div class="actions">
+    <form method="post" action="{% url 'gestion:relancer_retardataires' %}" class="en-ligne" onsubmit="return confirm('Envoyer une relance par e-mail aux {{ nb_retardataires }} EPN qui n\'ont pas encore envoyé leurs réponses ?')">
+      {% csrf_token %}<input type="hidden" name="campagne" value="{{ campagne.pk }}">
+      <button class="btn" {% if not nb_retardataires %}disabled{% endif %}>Relancer les retardataires ({{ nb_retardataires }})</button>
+    </form>
+    <a href="{% url 'gestion:export' %}?{{ request.GET.urlencode }}" class="btn primaire">Exporter en Excel</a>
+  </div>
+</div>
+{% include "enquete/gestion/_filtres.html" %}
+{% if non_invites %}<div class="message info">{{ non_invites }} EPN actif(s) n'ont pas encore reçu d'invitation. <a href="{% url 'gestion:invitations' %}?campagne={{ campagne.pk }}">Envoyer les invitations</a></div>{% endif %}
+<div class="grille">
+  <div class="carte kpi"><span class="libelle">EPN invités</span><span class="valeur">{{ invites }}</span><span class="discret petit">{{ compte.invite }} n'ont pas encore commencé</span></div>
+  <div class="carte kpi"><span class="libelle">Taux de réponse</span><span class="valeur">{{ taux }} %</span><div class="barre"><span style="width: {{ taux }}%"></span></div><span class="discret petit">{{ compte.soumis }} réponses envoyées</span></div>
+  <div class="carte kpi"><span class="libelle">En cours de saisie</span><span class="valeur">{{ compte.en_cours }}</span><span class="discret petit">brouillons enregistrés</span></div>
+  <div class="carte kpi"><span class="libelle">Effectif total déclaré</span><span class="valeur">{{ effectif_total|floatformat:"0g" }}</span><span class="discret petit">agents, réponses envoyées</span></div>
+</div>
+<div class="grille" style="--min: 380px">
+  <section class="carte"><h2>Avancement par statut</h2><div class="graphique" style="height: 240px"><canvas id="g-statuts" role="img" aria-label="Répartition des EPN par statut"></canvas></div></section>
+  <section class="carte"><h2>Taux de réponse par tutelle</h2><div class="graphique" style="height: 240px"><canvas id="g-tutelles" role="img" aria-label="Taux de réponse par tutelle"></canvas></div></section>
+</div>
+<div class="ligne">
+  <section class="carte sans-marge large">
+    <div class="tete"><h2>Retardataires <span class="discret" style="font-weight: 500">· {{ nb_retardataires }}</span></h2><a href="{% url 'gestion:reponses' %}?campagne={{ campagne.pk }}&statut=en_cours">Tout voir</a></div>
+    <div class="defilement"><table class="tableau"><thead><tr><th>EPN</th><th>Tutelle</th><th>Statut</th><th>Avancement</th><th>Relances</th><th></th></tr></thead><tbody>
+    {% for r in retardataires %}<tr>
+      <td><a href="{% url 'gestion:reponse_detail' r.pk %}"><strong>{{ r.epn.nom }}</strong></a></td><td>{{ r.epn.tutelle }}</td>
+      <td><span class="pastille {{ r.statut }}">{{ r.get_statut_display }}</span></td>
+      <td class="nowrap"><div style="display: flex; gap: 8px; align-items: center"><div class="barre mini"><span style="width: {{ r.avancement }}%"></span></div>{{ r.avancement }} %</div></td>
+      <td class="nombre">{{ r.nombre_relances }}</td>
+      <td><form method="post" action="{% url 'gestion:relancer' r.pk %}" class="en-ligne">{% csrf_token %}<input type="hidden" name="suivant" value="{{ request.get_full_path }}"><button class="btn petit">Relancer</button></form></td>
+    </tr>{% empty %}<tr><td colspan="6" class="discret">Aucun retardataire.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  <section class="carte cote"><h2>Indicateurs clés</h2><p class="discret petit">Sur les réponses envoyées.</p>
+    {% for i in indicateurs %}<div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #EEF1F5; padding-top: 10px"><span>{{ i.libelle }}</span><strong style="white-space: nowrap">{% if i.valeur is None %}—{% else %}{{ i.valeur|floatformat:1 }} %{% endif %}</strong></div>{% endfor %}
+  </section>
+</div>
+{{ compte|json_script:"d-statuts" }}
+{{ par_tutelle|json_script:"d-tutelles" }}
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function () {
+  if (!window.Chart) return;
+  Chart.defaults.font.family = "'Public Sans', system-ui, sans-serif";
+  const s = JSON.parse(document.getElementById('d-statuts').textContent);
+  new Chart(document.getElementById('g-statuts'), {
+    type: 'bar',
+    data: { labels: ['Envoyé', 'En cours', 'Non commencé'],
+      datasets: [{ data: [s.soumis, s.en_cours, s.invite], backgroundColor: ['#0E6B4F', '#E8B04A', '#C9D1DC'], borderRadius: 6 }] },
+    options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } } }
+  });
+  const t = JSON.parse(document.getElementById('d-tutelles').textContent);
+  new Chart(document.getElementById('g-tutelles'), {
+    type: 'bar',
+    data: { labels: t.map(x => x.libelle), datasets: [{ label: 'Taux de réponse (%)', data: t.map(x => x.taux), backgroundColor: '#1D4E89', borderRadius: 6 }] },
+    options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: c => c.raw + ' % (' + t[c.dataIndex].soumis + '/' + t[c.dataIndex].total + ')' } } },
+      scales: { x: { min: 0, max: 100, ticks: { callback: v => v + ' %' } }, y: { grid: { display: false } } } }
+  });
+})();
+</script>
+{% endblock %}

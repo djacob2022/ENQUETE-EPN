@@ -1,0 +1,12 @@
+{% extends "enquete/public/_base.html" %}
+{% block titre %}Réponses envoyées{% endblock %}
+{% block page %}
+<main class="etroit">
+  <div class="carte accent" style="align-items: flex-start">
+    <h1>Merci, vos réponses ont été envoyées.</h1>
+    <p>{{ reponse.epn.nom }} · reçu le {{ reponse.date_soumission|date:"j F Y à H:i" }}. Un accusé de réception a été envoyé à {{ reponse.email }}.</p>
+    <button type="button" class="btn no-print" onclick="window.print()">Imprimer le récapitulatif</button>
+  </div>
+  {% include "enquete/public/_recap.html" %}
+</main>
+{% endblock %}
