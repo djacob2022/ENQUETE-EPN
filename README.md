@@ -13,7 +13,7 @@ Application web de collecte d'informations auprès des Établissements Publics N
    - **exporter en Excel** (feuilles Réponses, Dictionnaire, Statistiques, Indicateurs avec graphique) ;
    - afficher les **statistiques et graphiques** (moyenne, médiane, écart-type, fréquences, indicateurs financiers et RH).
 
-Le questionnaire (8 rubriques, 52 questions) est défini dans `enquete/questionnaire.py`. Sa version imprimable est disponible dans l'espace administrateur, menu **Questionnaire**.
+Le questionnaire (8 rubriques, 43 questions) est défini dans `enquete/questionnaire.py`. Sa version imprimable est disponible dans l'espace administrateur, menu **Questionnaire**.
 
 ## Démarrage avec Docker
 
