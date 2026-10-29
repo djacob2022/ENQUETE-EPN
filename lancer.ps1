@@ -3,11 +3,21 @@
 #         .\lancer.ps1 arreter    arrete les conteneurs (les donnees sont conservees)
 #         .\lancer.ps1 effacer    arrete et SUPPRIME toutes les donnees (base, fichiers)
 param([string]$action = "demarrer")
-$ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-docker info *> $null
-if ($LASTEXITCODE -ne 0) { Write-Host "Docker n'est pas demarre. Lancez Docker Desktop puis relancez ce script." -ForegroundColor Red; exit 1 }
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+  Write-Host "Docker n'est pas installe. Installez Docker Desktop : https://www.docker.com/products/docker-desktop/" -ForegroundColor Red
+  exit 1
+}
+# Verification via cmd : sous Windows PowerShell 5.1, une erreur ecrite par docker sur stderr
+# interromprait le script au lieu d'afficher le message ci-dessous.
+cmd /c "docker info >nul 2>&1"
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "Docker Desktop n'est pas demarre (ou pas encore pret)." -ForegroundColor Red
+  Write-Host "Ouvrez Docker Desktop, attendez l'indication 'Engine running' en bas a gauche, puis relancez ce script."
+  exit 1
+}
+$ErrorActionPreference = "Stop"
 
 if ($action -eq "arreter") { docker compose stop; exit }
 if ($action -eq "effacer") { docker compose down -v; exit }
