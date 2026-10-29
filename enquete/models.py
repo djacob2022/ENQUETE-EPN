@@ -137,3 +137,36 @@ class Envoi(models.Model):
 
     class Meta:
         ordering = ["-date"]
+
+
+def chemin_piece(instance, nom_fichier):
+    """Chemin de stockage : jamais le nom fourni par l'utilisateur, seulement son extension."""
+    import os
+    import uuid
+
+    extension = os.path.splitext(nom_fichier)[1].lower()
+    r = instance.reponse
+    return f"pieces/{r.campagne_id}/{r.epn_id}/{instance.code}_{uuid.uuid4().hex}{extension}"
+
+
+class PieceJointe(models.Model):
+    """Fichier déposé pour une question de type « fichier » (une pièce par question)."""
+
+    reponse = models.ForeignKey(Reponse, on_delete=models.CASCADE, related_name="pieces")
+    code = models.CharField("question", max_length=10)
+    fichier = models.FileField(upload_to=chemin_piece, max_length=255)
+    nom_original = models.CharField(max_length=255)
+    taille = models.PositiveIntegerField("taille (octets)")
+    date_depot = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "pièce jointe"
+        constraints = [models.UniqueConstraint(fields=["reponse", "code"], name="une_piece_par_question")]
+
+    def __str__(self):
+        return f"{self.code} · {self.nom_original}"
+
+    def supprimer(self):
+        self.fichier.delete(save=False)
+        self.delete()

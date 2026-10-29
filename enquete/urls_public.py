@@ -10,4 +10,5 @@ urlpatterns = [
     path("r/<str:jeton>/module/<str:code>/", v.module, name="module"),
     path("r/<str:jeton>/recapitulatif/", v.recapitulatif, name="recapitulatif"),
     path("r/<str:jeton>/merci/", v.merci, name="merci"),
+    path("r/<str:jeton>/piece/<str:code>/", v.telecharger_piece, name="piece"),
 ]

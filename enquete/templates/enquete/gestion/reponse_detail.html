@@ -10,6 +10,7 @@
       <form method="post" action="{% url 'gestion:relancer' reponse.pk %}" class="en-ligne">{% csrf_token %}<input type="hidden" name="suivant" value="{{ request.get_full_path }}"><button class="btn">Relancer par e-mail</button></form>
       <form method="post" action="{% url 'gestion:reinviter' reponse.pk %}" class="en-ligne">{% csrf_token %}<button class="btn">Renvoyer l'invitation</button></form>
     {% endif %}
+    {% if pieces %}<a href="{% url 'gestion:pieces_zip' reponse.pk %}" class="btn">Pièces jointes (ZIP, {{ pieces|length }})</a>{% endif %}
     <button type="button" class="btn" onclick="window.print()">Imprimer</button>
   </div>
 </div>
@@ -17,7 +18,7 @@
   <div class="large" style="display: flex; flex-direction: column; gap: 16px">
     {% for bloc in recap %}
     <section class="carte"><div style="display: flex; justify-content: space-between; gap: 12px"><h2>{{ bloc.module.code }}. {{ bloc.module.titre }}</h2>{% if not bloc.fait %}<span class="pastille en_cours">Incomplet</span>{% endif %}</div>
-      <dl class="recap">{% for q, valeur in bloc.lignes %}<dt>{{ q.code }} · {{ q.libelle }}</dt><dd>{% if valeur == "" or valeur is None %}<span class="discret" style="font-weight: 400">—</span>{% elif q.type == "montant" or q.type == "entier" %}{{ valeur|floatformat:"0g" }}{% elif q.type == "pourcentage" %}{{ valeur }} %{% else %}{{ valeur }}{% endif %}</dd>{% endfor %}</dl>
+      <dl class="recap">{% for q, valeur in bloc.lignes %}<dt>{{ q.code }} · {{ q.libelle }}</dt><dd>{% if valeur == "" or valeur is None %}<span class="discret" style="font-weight: 400">—</span>{% elif q.type == "fichier" %}{% for code, p in pieces.items %}{% if code == q.code %}<a href="{% url 'gestion:piece' p.pk %}">{{ p.nom_original }}</a> <span class="discret petit" style="font-weight: 400">· {{ p.taille|filesizeformat }}</span>{% endif %}{% endfor %}{% else %}{{ valeur }}{% endif %}</dd>{% endfor %}</dl>
     </section>
     {% endfor %}
   </div>

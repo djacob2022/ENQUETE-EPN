@@ -1,4 +1,7 @@
 """Espace administrateur : suivi, invitations, relances, consultation, export Excel, statistiques."""
+import zipfile
+from io import BytesIO
+
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.db import transaction
@@ -6,13 +9,15 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.text import get_valid_filename
 from django.views.decorators.http import require_POST
 
 from . import export_excel, statistiques
 from .emails import envoyer_invitation, envoyer_relance
 from .forms import CampagneForm, ImportEPNForm
-from .models import EPN, Campagne, Reponse
-from .questionnaire import MODULES, libelle_reponse
+from .views_public import reponse_fichier
+from .models import EPN, Campagne, PieceJointe, Reponse
+from .questionnaire import MODULES, affichage
 
 # Réservé aux comptes « équipe » ; les autres sont renvoyés vers la page de connexion de l'application.
 staff_member_required = user_passes_test(lambda u: u.is_active and u.is_staff, login_url="login")
@@ -98,10 +103,34 @@ def reponses(request):
 def reponse_detail(request, pk):
     reponse = get_object_or_404(Reponse.objects.select_related("epn", "campagne"), pk=pk)
     recap = [{"module": m, "fait": m["code"] in reponse.modules_completes,
-              "lignes": [(q, libelle_reponse(q, reponse.donnees.get(q["code"]))) for q in m["questions"]]}
+              "lignes": [(q, affichage(q, reponse.donnees.get(q["code"]))) for q in m["questions"]]}
              for m in MODULES]
     return render(request, "enquete/gestion/reponse_detail.html",
-                  {"reponse": reponse, "recap": recap, "envois": reponse.envois.all()[:20]})
+                  {"reponse": reponse, "recap": recap, "envois": reponse.envois.all()[:20],
+                   "pieces": {p.code: p for p in reponse.pieces.all()}})
+
+
+@staff_member_required
+def piece(request, pk):
+    return reponse_fichier(get_object_or_404(PieceJointe, pk=pk))
+
+
+@staff_member_required
+def pieces_zip(request, pk):
+    """Toutes les pièces d'une réponse dans une archive ZIP."""
+    reponse = get_object_or_404(Reponse.objects.select_related("epn"), pk=pk)
+    tampon = BytesIO()
+    with zipfile.ZipFile(tampon, "w", zipfile.ZIP_DEFLATED) as archive:
+        for p in reponse.pieces.all():
+            try:
+                with p.fichier.open("rb") as f:
+                    archive.writestr(f"{p.code}_{get_valid_filename(p.nom_original)}", f.read())
+            except FileNotFoundError:
+                continue
+    resp = HttpResponse(tampon.getvalue(), content_type="application/zip")
+    nom = get_valid_filename(reponse.epn.sigle or reponse.epn.nom)
+    resp["Content-Disposition"] = f'attachment; filename="pieces_{nom}_{reponse.campagne.exercice}.zip"'
+    return resp
 
 
 @staff_member_required

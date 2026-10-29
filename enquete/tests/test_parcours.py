@@ -1,8 +1,12 @@
+import shutil
+from pathlib import Path
+import tempfile
 from datetime import timedelta
 from io import BytesIO
 
 from django.contrib.auth.models import User
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -21,11 +25,29 @@ REPONSES_VALIDES = {
     "F": {"F01": "2", "F02": "5", "F03": "40", "F04": "oui", "F05": ["comptabilite", "paie"]},
     "G": {"G01": "10", "G02": "7", "G03": "85.5"},
     "H": {"H01": ["financieres"], "H02": "Besoins", "H03": ""},
+    "J": {},
 }
+PDF = b"%PDF-1.4\n%test\n%%EOF\n"
 
 
-@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", SITE_URL="http://testserver")
+def pdf(nom="etats.pdf", contenu=PDF):
+    return SimpleUploadedFile(nom, contenu, content_type="application/pdf")
+
+
+def fichiers_valides():
+    return {"J01": pdf("etats_financiers.pdf"), "J02": pdf("rapport.pdf")}
+
+MEDIA_TEST = tempfile.mkdtemp()
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", SITE_URL="http://testserver",
+                   MEDIA_ROOT=MEDIA_TEST)
 class ParcoursTests(TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(MEDIA_TEST, ignore_errors=True)
+
     def setUp(self):
         aujourd_hui = timezone.localdate()
         self.campagne = Campagne.objects.create(nom="Enquête test", exercice=2024, active=True,
@@ -57,8 +79,10 @@ class ParcoursTests(TestCase):
         r = self._identifier(reponse)
         self.assertRedirects(r, reverse("public:module", args=[reponse.jeton, "A"]))
         for module in MODULES:
-            r = self.client.post(reverse("public:module", args=[reponse.jeton, module["code"]]),
-                                 REPONSES_VALIDES[module["code"]] | {"action": "suivant"})
+            donnees = REPONSES_VALIDES[module["code"]] | {"action": "suivant"}
+            if module["code"] == "J":
+                donnees |= fichiers_valides()
+            r = self.client.post(reverse("public:module", args=[reponse.jeton, module["code"]]), donnees)
             self.assertEqual(r.status_code, 302, f"module {module['code']} : {r.context and r.context['form'].errors}")
         r = self.client.post(reverse("public:recapitulatif", args=[reponse.jeton]), {"certification": "on"})
         self.assertRedirects(r, reverse("public:merci", args=[reponse.jeton]))
@@ -131,3 +155,85 @@ class ParcoursTests(TestCase):
         for nom in ("gestion:tableau_de_bord", "gestion:statistiques", "gestion:reponses", "gestion:questionnaire"):
             self.assertEqual(self.client.get(reverse(nom)).status_code, 200, nom)
         self.assertEqual(self.client.get(reverse("gestion:reponse_detail", args=[reponse.pk])).status_code, 200)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", MEDIA_ROOT=MEDIA_TEST)
+class PiecesJointesTests(TestCase):
+    def setUp(self):
+        aujourd_hui = timezone.localdate()
+        campagne = Campagne.objects.create(nom="C", exercice=2024, active=True,
+                                           date_ouverture=aujourd_hui, date_cloture=aujourd_hui + timedelta(days=5))
+        epn = EPN.objects.create(nom="E", tutelle="T", email_contact="e@epn.test")
+        self.reponse = Reponse.objects.create(campagne=campagne, epn=epn, nom="N", prenom="P",
+                                              statut=Reponse.Statut.EN_COURS)
+        self.url = reverse("public:module", args=[self.reponse.jeton, "J"])
+
+    def test_depot_puis_telechargement_par_le_lien(self):
+        r = self.client.post(self.url, fichiers_valides() | {"action": "suivant"})
+        self.assertEqual(r.status_code, 302)
+        self.reponse.refresh_from_db()
+        self.assertIn("J", self.reponse.modules_completes)
+        self.assertEqual(self.reponse.donnees["J01"], "etats_financiers.pdf")
+        piece = self.reponse.pieces.get(code="J01")
+        self.assertNotIn("etats_financiers", piece.fichier.name)  # nom de stockage aléatoire
+        r = self.client.get(reverse("public:piece", args=[self.reponse.jeton, "J01"]))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(b"".join(r.streaming_content), PDF)
+        self.assertIn('filename="etats_financiers.pdf"', r["Content-Disposition"])
+
+    def test_pieces_obligatoires(self):
+        r = self.client.post(self.url, {"action": "suivant"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["form"].errors["J01"], ["Ce champ est obligatoire."])
+
+    def test_fichier_valide_conserve_si_une_autre_piece_manque(self):
+        r = self.client.post(self.url, {"J01": pdf("etats.pdf"), "action": "suivant"})
+        self.assertEqual(r.status_code, 200)  # J02 manque : la rubrique n'est pas validée…
+        self.assertIn("J02", r.context["form"].errors)
+        self.assertTrue(self.reponse.pieces.filter(code="J01").exists())  # … mais J01 est gardé
+        self.assertContains(r, "etats.pdf")
+        r = self.client.post(self.url, {"J02": pdf("rapport.pdf"), "action": "suivant"})
+        self.assertEqual(r.status_code, 302)
+
+    def test_format_et_contenu_controles(self):
+        r = self.client.post(self.url, {"J01": SimpleUploadedFile("virus.exe", b"MZ..."), "action": "brouillon"})
+        self.assertContains(r, "Format non accepté")
+        r = self.client.post(self.url, {"J01": SimpleUploadedFile("faux.pdf", b"MZ\x90\x00"), "action": "brouillon"})
+        self.assertContains(r, "ne correspond pas à son extension")
+        self.assertFalse(self.reponse.pieces.exists())
+
+    def test_taille_maximale(self):
+        from enquete import pieces
+        ancien, pieces.TAILLE_MAX = pieces.TAILLE_MAX, 10
+        try:
+            r = self.client.post(self.url, {"J01": pdf(contenu=PDF * 2), "action": "brouillon"})
+            self.assertContains(r, "Fichier trop volumineux")
+        finally:
+            pieces.TAILLE_MAX = ancien
+
+    def test_remplacement_et_suppression(self):
+        self.client.post(self.url, fichiers_valides() | {"action": "suivant"})
+        ancien = self.reponse.pieces.get(code="J01").fichier.path
+        self.client.post(self.url, {"J01": pdf("v2.pdf"), "action": "brouillon"})
+        self.assertEqual(self.reponse.pieces.get(code="J01").nom_original, "v2.pdf")
+        self.assertFalse(Path(ancien).exists())
+        r = self.client.post(self.url, {"action": "supprimer:J01"})
+        self.assertEqual(r.status_code, 302)
+        self.reponse.refresh_from_db()
+        self.assertFalse(self.reponse.pieces.filter(code="J01").exists())
+        self.assertNotIn("J", self.reponse.modules_completes)
+
+    def test_un_autre_lien_ou_un_anonyme_ne_peut_pas_telecharger(self):
+        self.client.post(self.url, fichiers_valides() | {"action": "suivant"})
+        piece = self.reponse.pieces.get(code="J01")
+        self.assertEqual(self.client.get(reverse("public:piece", args=["autre-jeton", "J01"])).status_code, 404)
+        r = self.client.get(reverse("gestion:piece", args=[piece.pk]))
+        self.assertEqual(r.status_code, 302)
+        admin = User.objects.create_user("a", password="motdepasse-solide", is_staff=True)
+        self.client.force_login(admin)
+        self.assertEqual(self.client.get(reverse("gestion:piece", args=[piece.pk])).status_code, 200)
+        r = self.client.get(reverse("gestion:pieces_zip", args=[self.reponse.pk]))
+        self.assertEqual(r["Content-Type"], "application/zip")
+        import zipfile
+        self.assertEqual(sorted(zipfile.ZipFile(BytesIO(r.content)).namelist()),
+                         ["J01_etats_financiers.pdf", "J02_rapport.pdf"])

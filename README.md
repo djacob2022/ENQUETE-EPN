@@ -8,14 +8,52 @@ Application web de collecte d'informations auprès des Établissements Publics N
 2. **La personne qui reçoit le lien** clique dessus, saisit ses **nom, prénom, e-mail et téléphone**, clique sur **Suivant**, puis répond aux questions rubrique par rubrique. Les réponses sont enregistrées à chaque étape : elle peut reprendre plus tard avec le même lien. Elle relit un récapitulatif, certifie, puis clique sur **Envoyer**. Un accusé de réception est envoyé par e-mail.
 3. **L'espace administrateur** (`/gestion/`) permet de :
    - suivre l'avancement (tableau de bord, taux de réponse par tutelle) ;
-   - consulter chaque réponse et la rouvrir pour correction ;
+   - consulter chaque réponse, télécharger ses pièces jointes (une par une ou en ZIP) et la rouvrir pour correction ;
    - **relancer les retardataires** par e-mail, un par un ou tous ensemble ;
    - **exporter en Excel** (feuilles Réponses, Dictionnaire, Statistiques, Indicateurs avec graphique) ;
    - afficher les **statistiques et graphiques** (moyenne, médiane, écart-type, fréquences, indicateurs financiers et RH).
 
-Le questionnaire (8 rubriques, 43 questions) est défini dans `enquete/questionnaire.py`. Sa version imprimable est disponible dans l'espace administrateur, menu **Questionnaire**.
+Le questionnaire (9 rubriques, 48 questions, dont 5 pièces justificatives) est défini dans `enquete/questionnaire.py`. Sa version imprimable est disponible dans l'espace administrateur, menu **Questionnaire**.
 
-## Démarrage avec Docker
+## Installer et tester sur votre ordinateur
+
+**Prérequis :** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows, macOS) ou Docker Engine (Linux), démarré ; [Git](https://git-scm.com/downloads).
+
+1. Récupérer le code :
+
+   ```bash
+   git clone https://github.com/djacob2022/ENQUETE-EPN.git
+   cd ENQUETE-EPN
+   git checkout claude/tender-cannon-9lvbtv
+   ```
+
+2. Lancer l'application :
+   - Windows (PowerShell) : `.\lancer.ps1`. Si Windows bloque le script : `powershell -ExecutionPolicy Bypass -File .\lancer.ps1`.
+   - macOS / Linux : `./lancer.sh`
+
+   Au premier lancement, le script crée le fichier `.env` avec des mots de passe aléatoires et affiche l'identifiant administrateur (`admin`) et son mot de passe. La construction prend quelques minutes.
+
+3. Tester :
+   - **Espace administrateur :** http://localhost:8000/connexion/. Des EPN et des réponses fictives sont déjà chargés.
+   - **Côté EPN :** menu **Invitations**, puis cliquer sur « Envoyer les invitations ».
+   - **Lire l'e-mail reçu par l'EPN :** ouvrir http://localhost:8025 (Mailpit). Cliquer sur le lien qu'il contient pour remplir le questionnaire comme un EPN.
+   - **Retour côté administrateur :** relances, export Excel, statistiques.
+
+4. Arrêter : `.\lancer.ps1 arreter` ou `./lancer.sh arreter` (les données sont conservées). Tout effacer : `effacer` au lieu de `arreter`.
+
+Commandes utiles : `docker compose ps` (état des services), `docker compose logs -f web` (journal), `docker compose up -d --build` (reconstruire après une mise à jour du code avec `git pull`).
+
+Le port 8000 ou 8025 est déjà utilisé ? Dans `.env`, ajoutez `WEB_PORT=8080` et ouvrez http://localhost:8080 ; mettez aussi `SITE_URL=http://localhost:8080` et `DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:8080`.
+
+## Pièces justificatives
+
+La rubrique J permet de déposer des fichiers : états financiers et rapport d'activités (obligatoires), organigramme, procès-verbaux et autre document (facultatifs).
+
+- Formats acceptés : PDF, Word, Excel, JPG et PNG, 10 Mo maximum par fichier. Le contenu est contrôlé, pour refuser par exemple un exécutable renommé en `.pdf`.
+- Les fichiers sont stockés sous un nom aléatoire dans le volume Docker `media`. Ils ne sont jamais publiés directement : seuls l'EPN, avec son lien personnel, et les administrateurs connectés peuvent les télécharger.
+- Déposer un nouveau fichier remplace l'ancien. La sauvegarde quotidienne archive aussi ces fichiers.
+
+## Démarrage avec Docker (manuel)
 
 ```bash
 cp .env.example .env        # puis changer les mots de passe
@@ -27,7 +65,7 @@ docker compose up -d --build
 - Le compte administrateur est créé au premier démarrage à partir de `DJANGO_SUPERUSER_USERNAME` / `DJANGO_SUPERUSER_PASSWORD`.
 - Avec `CHARGER_DONNEES_DEMO=1`, des EPN et des réponses fictives sont chargés. **Mettre 0 en production.**
 
-Services : `web` (Django + Gunicorn), `db` (PostgreSQL 16), `mailpit` (e-mails de test), `backup` (sauvegarde quotidienne, conservée 30 jours).
+Services : `web` (Django + Gunicorn), `db` (PostgreSQL 16), `mailpit` (e-mails de test), `backup` (sauvegarde quotidienne de la base et des pièces jointes, conservée 30 jours).
 
 ### Mise en production
 

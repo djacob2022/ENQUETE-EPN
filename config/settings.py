@@ -117,6 +117,11 @@ STORAGES = {
     },
 }
 
+# Pièces jointes : jamais servies directement, uniquement via les vues de téléchargement contrôlées.
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
+FILE_UPLOAD_PERMISSIONS = 0o640
+DATA_UPLOAD_MAX_NUMBER_FILES = 10
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "login"

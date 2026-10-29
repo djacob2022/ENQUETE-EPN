@@ -4,7 +4,8 @@ Chaque module regroupe des questions identifiées par un code stable (A01, D03�
 Ces codes sont les noms de colonnes de l'export Excel et les clés du champ JSON
 `Reponse.donnees` : ne pas les renommer d'une campagne à l'autre.
 
-Types disponibles : texte, texte_long, entier, montant, pourcentage, choix, choix_multiple, oui_non, url.
+Types disponibles : texte, texte_long, entier, montant, pourcentage, choix, choix_multiple, oui_non, url, fichier.
+Pour « fichier », la valeur stockée dans `donnees` est le nom du fichier déposé ; le fichier lui-même est un `PieceJointe`.
 """
 
 OUI_NON = [("oui", "Oui"), ("non", "Non")]
@@ -22,7 +23,7 @@ MODULES = [
                        ("EPIC", "Établissement public à caractère industriel et commercial (EPIC)"),
                        ("AUTRE", "Autre catégorie")]},
             {"code": "A04", "libelle": "Référence du texte de création (décret, loi)", "type": "texte"},
-            {"code": "A05", "libelle": "Année de création", "type": "entier", "min": 1900, "max": 2100},
+            {"code": "A05", "libelle": "Année de création", "type": "entier", "min": 1900, "max": 2100, "annee": True},
             {"code": "A06", "libelle": "Ministère de tutelle technique", "type": "texte"},
             {"code": "A07", "libelle": "Ville du siège", "type": "texte"},
             {"code": "A08", "libelle": "Site web", "type": "url", "obligatoire": False},
@@ -118,6 +119,18 @@ MODULES = [
             {"code": "H03", "libelle": "Observations complémentaires", "type": "texte_long", "obligatoire": False},
         ],
     },
+    {
+        "code": "J",
+        "titre": "Pièces justificatives",
+        "intro": "Formats acceptés : PDF, Word, Excel, JPG ou PNG, 10 Mo maximum par fichier.",
+        "questions": [
+            {"code": "J01", "libelle": "États financiers de l'exercice", "type": "fichier"},
+            {"code": "J02", "libelle": "Rapport d'activités de l'exercice", "type": "fichier"},
+            {"code": "J03", "libelle": "Organigramme", "type": "fichier", "obligatoire": False},
+            {"code": "J04", "libelle": "Procès-verbaux du conseil de gestion", "type": "fichier", "obligatoire": False},
+            {"code": "J05", "libelle": "Autre document utile", "type": "fichier", "obligatoire": False},
+        ],
+    },
 ]
 
 
@@ -188,3 +201,15 @@ def libelle_reponse(q, valeur):
         libelles = dict(q["choix"])
         return ", ".join(libelles.get(v, v) for v in valeur)
     return valeur
+
+
+def affichage(q, valeur):
+    """Valeur mise en forme pour les récapitulatifs à l'écran (milliers séparés, pourcentages…)."""
+    if valeur in (None, "", []):
+        return ""
+    if q["type"] in ("entier", "montant") and not q.get("annee"):
+        texte = f"{valeur:,.2f}".rstrip("0").rstrip(".") if isinstance(valeur, float) else f"{valeur:,}"
+        return texte.replace(",", "\u202f").replace(".", ",")
+    if q["type"] == "pourcentage":
+        return f"{valeur} %".replace(".", ",")
+    return libelle_reponse(q, valeur)

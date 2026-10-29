@@ -1,14 +1,15 @@
 """Parcours du répondant : lien reçu par e-mail → identification → modules → récapitulatif → envoi."""
 from django.contrib import messages
 from django.db import transaction
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .emails import envoyer_accuse
 from .forms import CertificationForm, IdentificationForm, ModuleForm
-from .models import Reponse
-from .questionnaire import MODULES, libelle_reponse
+from .models import PieceJointe, Reponse
+from .questionnaire import MODULES, affichage
 
 
 def _charger(jeton):
@@ -65,15 +66,21 @@ def module(request, jeton, code):
     if index is None:
         return redirect("public:module", jeton=jeton, code=MODULES[0]["code"])
     mod = MODULES[index]
+    pieces = {p.code: p for p in reponse.pieces.all()}
 
     if request.method == "POST":
         action = request.POST.get("action", "suivant")
+        if action.startswith("supprimer:"):
+            return _supprimer_piece(request, reponse, mod, action.split(":", 1)[1], pieces)
         brouillon = action in ("brouillon", "precedent")
-        form = ModuleForm(mod, request.POST, brouillon=brouillon)
+        form = ModuleForm(mod, request.POST, request.FILES, brouillon=brouillon, pieces=pieces)
         if form.is_valid():
             reponse.donnees.update(form.valeurs_json())
+            for code_q, fichier in form.fichiers_deposes().items():
+                pieces[code_q] = _enregistrer_piece(reponse, code_q, fichier, pieces.get(code_q))
+                reponse.donnees[code_q] = pieces[code_q].nom_original
             # Un module n'est « complété » que s'il passe la validation complète (obligatoires + cohérence).
-            complet = not brouillon or ModuleForm(mod, request.POST).is_valid()
+            complet = not brouillon or ModuleForm(mod, request.POST, pieces=pieces).is_valid()
             if complet and mod["code"] not in reponse.modules_completes:
                 reponse.modules_completes.append(mod["code"])
             elif not complet and mod["code"] in reponse.modules_completes:
@@ -89,9 +96,16 @@ def module(request, jeton, code):
             if index + 1 < len(MODULES):
                 return redirect("public:module", jeton=jeton, code=MODULES[index + 1]["code"])
             return redirect("public:recapitulatif", jeton=jeton)
+        # Les fichiers valides sont conservés même si d'autres réponses de la rubrique sont à corriger.
+        for code_q, fichier in form.fichiers_deposes().items():
+            pieces[code_q] = _enregistrer_piece(reponse, code_q, fichier, pieces.get(code_q))
+            reponse.donnees[code_q] = pieces[code_q].nom_original
+            form.fields[code_q].piece = pieces[code_q]
+            reponse.save(update_fields=["donnees", "date_modification"])
         messages.error(request, "Certaines réponses sont à corriger avant de continuer.")
     else:
-        form = ModuleForm(mod, initial={q["code"]: reponse.donnees.get(q["code"]) for q in mod["questions"]})
+        form = ModuleForm(mod, pieces=pieces, initial={
+            q["code"]: reponse.donnees.get(q["code"]) for q in mod["questions"] if q["type"] != "fichier"})
 
     return render(request, "enquete/public/module.html", {
         "reponse": reponse, "module": mod, "form": form, "index": index + 1, "total": len(MODULES),
@@ -100,10 +114,48 @@ def module(request, jeton, code):
     })
 
 
+def _enregistrer_piece(reponse, code, fichier, ancienne):
+    """Enregistre le fichier déposé ; une nouvelle pièce remplace l'ancienne pour la même question."""
+    nouvelle = PieceJointe(reponse=reponse, code=code, nom_original=fichier.name[:255], taille=fichier.size)
+    nouvelle.fichier.save(fichier.name, fichier, save=False)
+    with transaction.atomic():
+        if ancienne:
+            ancienne.supprimer()
+        nouvelle.save()
+    return nouvelle
+
+
+def _supprimer_piece(request, reponse, mod, code_q, pieces):
+    piece = pieces.get(code_q)
+    if piece and any(q["code"] == code_q for q in mod["questions"]):
+        piece.supprimer()
+        reponse.donnees.pop(code_q, None)
+        obligatoire = next(q for q in mod["questions"] if q["code"] == code_q).get("obligatoire", True)
+        if obligatoire and mod["code"] in reponse.modules_completes:
+            reponse.modules_completes.remove(mod["code"])
+        reponse.save()
+        messages.success(request, f"Fichier « {piece.nom_original} » supprimé.")
+    return redirect("public:module", jeton=reponse.jeton, code=mod["code"])
+
+
+def telecharger_piece(request, jeton, code):
+    """Téléchargement d'une pièce par l'EPN lui-même (le lien personnel fait office d'autorisation)."""
+    piece = get_object_or_404(PieceJointe, reponse__jeton=jeton, code=code)
+    return reponse_fichier(piece)
+
+
+def reponse_fichier(piece):
+    try:
+        fichier = piece.fichier.open("rb")
+    except FileNotFoundError:
+        raise Http404("Fichier introuvable.")
+    return FileResponse(fichier, as_attachment=True, filename=piece.nom_original)
+
+
 def _recapitulatif(reponse):
     return [
         {"module": m, "fait": m["code"] in reponse.modules_completes,
-         "lignes": [(q, libelle_reponse(q, reponse.donnees.get(q["code"]))) for q in m["questions"]]}
+         "lignes": [(q, affichage(q, reponse.donnees.get(q["code"]))) for q in m["questions"]]}
         for m in MODULES
     ]
 

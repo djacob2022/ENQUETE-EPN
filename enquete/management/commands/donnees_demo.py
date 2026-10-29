@@ -2,10 +2,11 @@
 import random
 from datetime import timedelta
 
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from enquete.models import EPN, Campagne, Reponse
+from enquete.models import EPN, Campagne, PieceJointe, Reponse
 from enquete.questionnaire import MODULES
 
 EPN_DEMO = [
@@ -102,6 +103,13 @@ class Command(BaseCommand):
                 reponse.statut = Reponse.Statut.EN_COURS
                 reponse.date_debut = timezone.now() - timedelta(days=3)
             reponse.save()
+            if reponse.statut == Reponse.Statut.SOUMIS:
+                for code_q, nom in (("J01", "etats_financiers.pdf"), ("J02", "rapport_activites.pdf")):
+                    contenu = b"%PDF-1.4\n% Document fictif de demonstration\n%%EOF\n"
+                    piece = PieceJointe(reponse=reponse, code=code_q, nom_original=nom, taille=len(contenu))
+                    piece.fichier.save(nom, ContentFile(contenu), save=True)
+                    reponse.donnees[code_q] = nom
+                reponse.save(update_fields=["donnees"])
 
         self.stdout.write(self.style.SUCCESS(
             f"{len(epns)} EPN, campagne « {campagne} » : {campagne.reponses.filter(statut='soumis').count()} réponses envoyées."))

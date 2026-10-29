@@ -10,6 +10,8 @@ services:
       POSTGRES_HOST: db
     ports:
       - "${WEB_PORT:-8000}:8000"
+    volumes:
+      - media:/app/media   # pièces jointes déposées par les EPN
     depends_on:
       db:
         condition: service_healthy
@@ -37,7 +39,7 @@ services:
       - "8025:8025"
     restart: unless-stopped
 
-  # Sauvegarde quotidienne de la base, conservée 30 jours dans le volume « backups ».
+  # Sauvegarde quotidienne de la base et des pièces jointes, conservée 30 jours dans le volume « backups ».
   backup:
     image: postgres:16-alpine
     environment:
@@ -47,10 +49,13 @@ services:
       PGDATABASE: ${POSTGRES_DB:-enquete}
     volumes:
       - backups:/backups
+      - media:/media:ro
     entrypoint: >
       sh -c 'while true; do
-        pg_dump -Fc > /backups/enquete_$$(date +%Y-%m-%d_%H%M).dump &&
-        find /backups -name "*.dump" -mtime +30 -delete;
+        jour=$$(date +%Y-%m-%d_%H%M);
+        pg_dump -Fc > /backups/enquete_$$jour.dump &&
+        tar -czf /backups/pieces_$$jour.tar.gz -C /media . &&
+        find /backups \( -name "*.dump" -o -name "*.tar.gz" \) -mtime +30 -delete;
         sleep 86400; done'
     depends_on:
       db:
@@ -59,4 +64,5 @@ services:
 
 volumes:
   pgdata:
+  media:
   backups:

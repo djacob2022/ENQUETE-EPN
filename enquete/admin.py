@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import EPN, Campagne, Envoi, Reponse
+from .models import EPN, Campagne, Envoi, PieceJointe, Reponse
 
 
 @admin.register(EPN)
@@ -27,3 +27,10 @@ class ReponseAdmin(admin.ModelAdmin):
 class EnvoiAdmin(admin.ModelAdmin):
     list_display = ["reponse", "type", "destinataires", "date", "succes", "par"]
     list_filter = ["type", "succes"]
+
+
+@admin.register(PieceJointe)
+class PieceJointeAdmin(admin.ModelAdmin):
+    list_display = ["reponse", "code", "nom_original", "taille", "date_depot"]
+    list_filter = ["code"]
+    search_fields = ["reponse__epn__nom", "nom_original"]

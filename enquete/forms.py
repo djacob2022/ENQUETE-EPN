@@ -4,6 +4,7 @@ from django import forms
 from django.core.validators import MaxValueValidator, MinValueValidator
 
 from .models import EPN, Campagne, Reponse
+from .pieces import ACCEPT, LIBELLE_FORMATS, valider_piece
 from .questionnaire import OUI_NON, REGLES_COHERENCE
 
 
@@ -32,8 +33,9 @@ class IdentificationForm(forms.ModelForm):
         return tel
 
 
-def _champ(q, brouillon):
-    requis = q.get("obligatoire", True) and not brouillon
+def _champ(q, brouillon, deja_depose=False):
+    # Une pièce déjà déposée satisfait l'obligation : on ne redemande pas le fichier.
+    requis = q.get("obligatoire", True) and not brouillon and not deja_depose
     aide = q.get("aide", "") or (f"En {q['unite']}." if q.get("unite") else "")
     commun = {"label": f"{q['code']} · {q['libelle']}", "required": requis, "help_text": aide}
     t = q["type"]
@@ -62,6 +64,9 @@ def _champ(q, brouillon):
         return forms.ChoiceField(choices=q["choix"], widget=forms.RadioSelect, **commun)
     if t == "choix_multiple":
         return forms.MultipleChoiceField(choices=q["choix"], widget=forms.CheckboxSelectMultiple, **commun)
+    if t == "fichier":
+        commun["help_text"] = commun["help_text"] or f"{LIBELLE_FORMATS} · 10 Mo maximum."
+        return forms.FileField(validators=[valider_piece], widget=forms.FileInput(attrs={"accept": ACCEPT}), **commun)
     raise ValueError(f"Type de question inconnu : {t}")
 
 
@@ -81,14 +86,19 @@ class ModuleForm(forms.Form):
     la personne peut enregistrer et revenir plus tard.
     """
 
-    def __init__(self, module, *args, brouillon=False, **kwargs):
+    def __init__(self, module, *args, brouillon=False, pieces=None, **kwargs):
+        """`pieces` : pièces jointes déjà déposées pour cette réponse, par code de question."""
         super().__init__(*args, **kwargs)
         self.module = module
         self.brouillon = brouillon
+        pieces = pieces or {}
         for q in module["questions"]:
-            self.fields[q["code"]] = _champ(q, brouillon)
+            champ = _champ(q, brouillon, deja_depose=q["code"] in pieces)
             # Les textes longs et les listes de choix occupent toute la largeur ; les nombres vont par deux.
-            self.fields[q["code"]].pleine_largeur = q["type"] in ("texte_long", "choix", "choix_multiple", "texte", "url")
+            champ.pleine_largeur = q["type"] in ("texte_long", "choix", "choix_multiple", "texte", "url", "fichier")
+            champ.piece = pieces.get(q["code"])
+            champ.obligatoire = q.get("obligatoire", True)
+            self.fields[q["code"]] = champ
 
     def clean(self):
         donnees = super().clean()
@@ -102,7 +112,13 @@ class ModuleForm(forms.Form):
         return donnees
 
     def valeurs_json(self):
-        return {code: vers_json(v) for code, v in self.cleaned_data.items()}
+        """Valeurs à stocker, hors fichiers (enregistrés à part par `fichiers_deposes`)."""
+        return {code: vers_json(v) for code, v in self.cleaned_data.items()
+                if not isinstance(self.fields[code], forms.FileField)}
+
+    def fichiers_deposes(self):
+        return {code: f for code, f in self.cleaned_data.items()
+                if isinstance(self.fields[code], forms.FileField) and f}
 
 
 class CertificationForm(forms.Form):
