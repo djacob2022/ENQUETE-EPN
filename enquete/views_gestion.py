@@ -195,6 +195,28 @@ def invitations(request):
 
 
 @staff_member_required
+def liens(request):
+    """Le lien personnel de chaque EPN, à copier ou à exporter pour un envoi depuis sa propre messagerie."""
+    campagne = _campagne(request)
+    if campagne is None:
+        return _sans_campagne(request)
+    if request.method == "POST":
+        crees = campagne.generer_liens()
+        messages.success(request, f"{crees} lien(s) généré(s)." if crees else "Tous les EPN actifs ont déjà un lien.")
+        return redirect(f"{request.path}?campagne={campagne.pk}")
+    reponses = campagne.reponses.select_related("epn").order_by("epn__nom")
+    if request.GET.get("format") == "xlsx":
+        contenu = export_excel.classeur_liens(campagne, reponses)
+        resp = HttpResponse(contenu, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        resp["Content-Disposition"] = f'attachment; filename="liens_EPN_{campagne.exercice}.xlsx"'
+        return resp
+    sans_lien = EPN.objects.filter(actif=True).exclude(reponses__campagne=campagne).count()
+    return render(request, "enquete/gestion/liens.html",
+                  {"campagne": campagne, "campagnes": Campagne.objects.all(), "reponses": reponses,
+                   "sans_lien": sans_lien})
+
+
+@staff_member_required
 @require_POST
 def reinviter(request, pk):
     reponse = get_object_or_404(Reponse.objects.select_related("epn", "campagne"), pk=pk)

@@ -1,0 +1,41 @@
+{% extends "enquete/gestion/_base.html" %}
+{% block titre %}Liens des EPN{% endblock %}
+{% block page %}
+<div class="titre-page">
+  <div><h1>Liens des EPN</h1><p class="discret">{{ campagne.nom }} · un lien unique par établissement, à envoyer à son point focal.</p></div>
+  <div class="actions">
+    <form method="post" class="en-ligne">{% csrf_token %}<button class="btn" {% if not sans_lien %}disabled{% endif %}>Générer les liens manquants ({{ sans_lien }})</button></form>
+    <a href="?campagne={{ campagne.pk }}&format=xlsx" class="btn primaire">Exporter les liens (Excel)</a>
+  </div>
+</div>
+<form method="get" class="carte filtres" aria-label="Campagne">
+  <label class="champ"><span class="etiquette">Campagne</span><select name="campagne" onchange="this.form.submit()">{% for c in campagnes %}<option value="{{ c.pk }}" {% if c.pk == campagne.pk %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+</form>
+<div class="message info">Chaque lien donne accès au formulaire de un seul EPN : transmettez-le uniquement à son point focal. Pour un envoi automatique par e-mail, utilisez plutôt <a href="{% url 'gestion:invitations' %}?campagne={{ campagne.pk }}">Invitations</a>.</div>
+<section class="carte sans-marge"><div class="defilement"><table class="tableau">
+  <thead><tr><th>EPN</th><th>Point focal</th><th>Lien personnel</th><th>Statut</th></tr></thead>
+  <tbody>{% for r in reponses %}<tr>
+    <td><strong>{{ r.epn.nom }}</strong><br><span class="discret petit">{{ r.epn.tutelle }}</span></td>
+    <td>{{ r.epn.email_contact }}</td>
+    <td style="min-width: 380px"><div style="display: flex; gap: 8px; align-items: center">
+      <input class="saisie" readonly value="{{ r.lien }}" id="lien-{{ r.pk }}" aria-label="Lien de {{ r.epn.nom }}" onclick="this.select()" style="font-size: 13px">
+      <button type="button" class="btn petit" data-copier="lien-{{ r.pk }}">Copier</button>
+      <a href="{{ r.lien }}" target="_blank" rel="noopener" class="btn petit">Ouvrir</a>
+    </div></td>
+    <td><span class="pastille {{ r.statut }}">{{ r.get_statut_display }}</span></td>
+  </tr>{% empty %}<tr><td colspan="4" class="discret">Aucun lien pour cette campagne. Cliquez sur « Générer les liens manquants ».</td></tr>{% endfor %}</tbody>
+</table></div></section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-copier]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    const champ = document.getElementById(b.dataset.copier);
+    champ.select();
+    const fini = function () { b.textContent = 'Copié ✓'; setTimeout(function () { b.textContent = 'Copier'; }, 1500); };
+    if (navigator.clipboard) { navigator.clipboard.writeText(champ.value).then(fini, function () { document.execCommand('copy'); fini(); }); }
+    else { document.execCommand('copy'); fini(); }
+  });
+});
+</script>
+{% endblock %}

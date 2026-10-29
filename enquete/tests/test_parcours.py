@@ -237,3 +237,39 @@ class PiecesJointesTests(TestCase):
         import zipfile
         self.assertEqual(sorted(zipfile.ZipFile(BytesIO(r.content)).namelist()),
                          ["J01_etats_financiers.pdf", "J02_rapport.pdf"])
+
+
+class LiensTests(TestCase):
+    def setUp(self):
+        aujourd_hui = timezone.localdate()
+        self.campagne = Campagne.objects.create(nom="C", exercice=2024, active=True, date_ouverture=aujourd_hui,
+                                                date_cloture=aujourd_hui + timedelta(days=5))
+        for i in range(3):
+            EPN.objects.create(nom=f"EPN {i}", tutelle="T", email_contact=f"e{i}@epn.test")
+        EPN.objects.create(nom="Inactif", tutelle="T", email_contact="x@epn.test", actif=False)
+        self.client.force_login(User.objects.create_user("a", password="motdepasse-solide", is_staff=True))
+
+    def test_generer_afficher_et_exporter_les_liens_sans_envoyer_d_email(self):
+        self.client.post(reverse("gestion:liens"))
+        self.assertEqual(self.campagne.reponses.count(), 3)  # un lien par EPN actif
+        self.assertEqual(len(mail.outbox), 0)
+        jetons = set(self.campagne.reponses.values_list("jeton", flat=True))
+        self.assertEqual(len(jetons), 3)  # liens tous différents
+        r = self.client.get(reverse("gestion:liens"))
+        for rep in self.campagne.reponses.all():
+            self.assertContains(r, rep.lien)
+        self.client.post(reverse("gestion:liens"))  # idempotent : ne recrée rien
+        self.assertEqual(set(self.campagne.reponses.values_list("jeton", flat=True)), jetons)
+        r = self.client.get(reverse("gestion:liens") + "?format=xlsx")
+        ws = load_workbook(BytesIO(r.content))["Liens"]
+        self.assertEqual(ws.max_row, 4)
+        self.assertTrue(ws.cell(row=2, column=5).value.startswith("http"))
+
+    def test_commande_liens_epn(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+        sortie = StringIO()
+        call_command("liens_epn", "--generer", stdout=sortie)
+        self.assertIn("3 lien(s) généré(s)", sortie.getvalue())
+        self.assertEqual(sortie.getvalue().count("/r/"), 3)

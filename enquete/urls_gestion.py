@@ -15,6 +15,7 @@ urlpatterns = [
     path("pieces/<int:pk>/", v.piece, name="piece"),
     path("relancer-retardataires/", v.relancer_retardataires, name="relancer_retardataires"),
     path("invitations/", v.invitations, name="invitations"),
+    path("liens/", v.liens, name="liens"),
     path("export.xlsx", v.export, name="export"),
     path("statistiques/", v.stats, name="statistiques"),
     path("epn/", v.epn_liste, name="epn"),

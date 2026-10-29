@@ -35,11 +35,17 @@ Le questionnaire (9 rubriques, 48 questions, dont 5 pièces justificatives) est 
 
 3. Tester :
    - **Espace administrateur :** http://localhost:8000/connexion/. Des EPN et des réponses fictives sont déjà chargés.
-   - **Côté EPN :** menu **Invitations**, puis cliquer sur « Envoyer les invitations ».
+   - **Côté EPN :** menu **Liens des EPN**. Chaque EPN y a son lien unique, avec les boutons « Copier » et « Ouvrir ». Le bouton « Générer les liens manquants » crée les liens des nouveaux EPN, et « Exporter les liens (Excel) » donne la liste complète pour un publipostage. Le menu **Invitations** envoie ces mêmes liens automatiquement par e-mail.
    - **Lire l'e-mail reçu par l'EPN :** ouvrir http://localhost:8025 (Mailpit). Cliquer sur le lien qu'il contient pour remplir le questionnaire comme un EPN.
    - **Retour côté administrateur :** relances, export Excel, statistiques.
 
 4. Arrêter : `.\lancer.ps1 arreter` ou `./lancer.sh arreter` (les données sont conservées). Tout effacer : `effacer` au lieu de `arreter`.
+
+Afficher tous les liens dans le terminal (`--generer` crée d'abord ceux qui manquent) :
+
+```bash
+docker compose exec web python manage.py liens_epn --generer
+```
 
 Commandes utiles : `docker compose ps` (état des services), `docker compose logs -f web` (journal), `docker compose up -d --build` (reconstruire après une mise à jour du code avec `git pull`).
 

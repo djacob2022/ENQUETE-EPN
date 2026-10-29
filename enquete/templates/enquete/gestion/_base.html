@@ -13,6 +13,7 @@
     <a href="{% url 'gestion:tableau_de_bord' %}" class="{% if n == 'tableau_de_bord' %}actif{% endif %}">Tableau de bord</a>
     <a href="{% url 'gestion:reponses' %}" class="{% if n == 'reponses' or n == 'reponse_detail' %}actif{% endif %}">Réponses des EPN</a>
     <a href="{% url 'gestion:invitations' %}" class="{% if n == 'invitations' %}actif{% endif %}">Invitations</a>
+    <a href="{% url 'gestion:liens' %}" class="{% if n == 'liens' %}actif{% endif %}">Liens des EPN</a>
     <a href="{% url 'gestion:statistiques' %}" class="{% if n == 'statistiques' %}actif{% endif %}">Statistiques</a>
     <a href="{% url 'gestion:epn' %}" class="{% if n == 'epn' %}actif{% endif %}">Répertoire des EPN</a>
     <a href="{% url 'gestion:campagnes' %}" class="{% if 'campagne' in n %}actif{% endif %}">Campagnes</a>

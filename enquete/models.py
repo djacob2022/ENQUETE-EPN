@@ -55,6 +55,16 @@ class Campagne(models.Model):
     def courante(cls):
         return cls.objects.filter(active=True).first()
 
+    def generer_liens(self, epns=None):
+        """Crée le lien personnel (une Reponse) de chaque EPN actif qui n'en a pas encore. Renvoie le nombre créé."""
+        if epns is None:
+            epns = EPN.objects.filter(actif=True)
+        crees = 0
+        for epn in epns.exclude(reponses__campagne=self):
+            _, cree = Reponse.objects.get_or_create(campagne=self, epn=epn)
+            crees += cree
+        return crees
+
     @property
     def est_ouverte(self):
         aujourd_hui = timezone.localdate()

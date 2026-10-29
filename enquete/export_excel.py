@@ -119,6 +119,24 @@ def classeur(campagne, reponses):
     return tampon.getvalue()
 
 
+def classeur_liens(campagne, reponses):
+    """Liste des liens personnels, prête pour un publipostage (une ligne par EPN)."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Liens"
+    _entete(ws, ["EPN", "Sigle", "Tutelle", "E-mail du point focal", "Lien personnel", "Statut"])
+    for r in reponses:
+        ws.append([r.epn.nom, r.epn.sigle, r.epn.tutelle, r.epn.email_contact, r.lien, r.get_statut_display()])
+        cellule = ws.cell(row=ws.max_row, column=5)
+        cellule.hyperlink = r.lien
+        cellule.style = "Hyperlink"
+    _largeurs(ws, 70)
+    wb.properties.title = f"Liens {campagne}"
+    tampon = BytesIO()
+    wb.save(tampon)
+    return tampon.getvalue()
+
+
 def nom_fichier(campagne):
     return f"EPN_{campagne.exercice}_{timezone.localdate():%Y-%m-%d}.xlsx"
 
