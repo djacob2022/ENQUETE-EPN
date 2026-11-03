@@ -1,8 +1,0 @@
-{% extends "enquete/base.html" %}
-{% block corps %}
-<header class="entete">
-  <div class="marque"><div class="logo" aria-hidden="true">EPN</div><div><strong>ENQUÊTE-EPN</strong><span>{{ NOM_INSTITUTION }}</span></div></div>
-  {% if reponse.nom %}<div class="utilisateur"><span><strong>{{ reponse.repondant }}</strong><br><span class="discret petit">{{ reponse.epn.nom }}</span></span></div>{% endif %}
-</header>
-{% block page %}{% endblock %}
-{% endblock %}

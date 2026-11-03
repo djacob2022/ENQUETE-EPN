@@ -212,4 +212,4 @@ def affichage(q, valeur):
         return texte.replace(",", "\u202f").replace(".", ",")
     if q["type"] == "pourcentage":
         return f"{valeur} %".replace(".", ",")
-    return libelle_reponse(q, valeur)
+    return str(libelle_reponse(q, valeur))

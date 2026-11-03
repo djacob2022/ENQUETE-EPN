@@ -5,3 +5,5 @@ staticfiles
 __pycache__
 docs
 media
+frontend/node_modules
+frontend/dist

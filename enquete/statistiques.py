@@ -44,6 +44,8 @@ def par_question(reponses):
         bloc = {"module": module, "questions": []}
         for q in module["questions"]:
             valeurs = [r.donnees.get(q["code"]) for r in reponses]
+            if q.get("annee"):
+                continue  # une somme ou une moyenne d'années n'a pas de sens
             if q["type"] in TYPES_NUMERIQUES:
                 bloc["questions"].append({"q": q, "genre": "numerique", "stats": descriptifs(valeurs)})
             elif q["type"] in ("choix", "choix_multiple", "oui_non"):

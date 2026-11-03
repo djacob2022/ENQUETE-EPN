@@ -2,6 +2,16 @@
 
 Application web de collecte d'informations auprès des Établissements Publics Nationaux (EPN), avec export Excel, statistiques et graphiques.
 
+## Architecture
+
+| Couche | Technologies | Rôle |
+| --- | --- | --- |
+| Interface (`frontend/`) | React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, Recharts, Framer Motion | Formulaire des EPN, espace administrateur, thème clair/sombre, mobile |
+| API (`enquete/`, `config/`) | Python 3.12, Django 5 | API JSON, règles de validation et de cohérence, e-mails, exports Excel, pièces jointes |
+| Données | PostgreSQL 16 | Établissements, campagnes, réponses, fichiers |
+
+L'interface appelle l'API sous `/api/` (même origine, session et jeton CSRF). En production, l'image Docker construit l'interface React, puis Django la sert avec ses fichiers statiques.
+
 ## Fonctionnement
 
 1. **L'administrateur** importe la liste des EPN (fichier Excel), crée une campagne, puis envoie les **invitations** : chaque EPN reçoit par e-mail un **lien personnel**.
@@ -81,16 +91,24 @@ Services : `web` (Django + Gunicorn), `db` (PostgreSQL 16), `mailpit` (e-mails d
 
 ## Développement sans Docker
 
+Deux terminaux : l'API Python, puis l'interface React (rechargement instantané).
+
 ```bash
 pip install -r requirements.txt
 export DJANGO_DEBUG=1 EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 python manage.py migrate
 python manage.py donnees_demo        # facultatif
 python manage.py createsuperuser
-python manage.py runserver
+python manage.py runserver           # API sur http://localhost:8000
 ```
 
-Tests : `DJANGO_DEBUG=1 python manage.py test enquete`
+```bash
+cd frontend
+npm install
+npm run dev                          # interface sur http://localhost:5173 (relaie /api vers :8000)
+```
+
+Tests de l'API : `DJANGO_DEBUG=1 python manage.py test enquete`. Vérification des types de l'interface : `cd frontend && npm run typecheck`.
 
 ## Importer les EPN
 

@@ -1,14 +1,12 @@
-from django.urls import path
+"""Pages de l'interface React. Les noms servent à construire les liens envoyés par e-mail."""
+from django.urls import path, re_path
 
-from . import views_public as v
+from .spa import application
 
 app_name = "public"
 
 urlpatterns = [
-    path("", v.page_accueil, name="page_accueil"),
-    path("r/<str:jeton>/", v.accueil, name="accueil"),
-    path("r/<str:jeton>/module/<str:code>/", v.module, name="module"),
-    path("r/<str:jeton>/recapitulatif/", v.recapitulatif, name="recapitulatif"),
-    path("r/<str:jeton>/merci/", v.merci, name="merci"),
-    path("r/<str:jeton>/piece/<str:code>/", v.telecharger_piece, name="piece"),
+    path("", application, name="page_accueil"),
+    path("r/<str:jeton>/", application, name="accueil"),
+    re_path(r"^(?:r|gestion|connexion)(?:/.*)?$", application, name="application"),
 ]

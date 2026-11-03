@@ -1,9 +1,0 @@
-<form method="get" class="carte filtres" aria-label="Filtres">
-  <label class="champ"><span class="etiquette">Campagne</span><select name="campagne">{% for c in campagnes %}<option value="{{ c.pk }}" {% if c.pk == campagne.pk %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
-  <label class="champ"><span class="etiquette">Tutelle</span><select name="tutelle"><option value="">Toutes</option>{% for t in tutelles %}<option {% if f.tutelle == t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
-  <label class="champ"><span class="etiquette">Catégorie</span><select name="categorie"><option value="">Toutes</option>{% for v, l in categories %}<option value="{{ v }}" {% if f.categorie == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
-  <label class="champ"><span class="etiquette">Région</span><select name="region"><option value="">Toutes</option>{% for r in regions %}<option {% if f.region == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
-  {% if avec_statut %}<label class="champ"><span class="etiquette">Statut</span><select name="statut"><option value="">Tous</option>{% for v, l in statuts %}<option value="{{ v }}" {% if f.statut == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
-  <label class="champ"><span class="etiquette">Recherche</span><input type="search" name="q" value="{{ f.q|default:'' }}" placeholder="EPN, sigle, répondant"></label>{% endif %}
-  <button class="btn">Filtrer</button>
-</form>

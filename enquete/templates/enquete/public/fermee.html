@@ -1,9 +1,0 @@
-{% extends "enquete/public/_base.html" %}
-{% block titre %}Campagne fermée{% endblock %}
-{% block page %}
-<main class="etroit"><div class="carte accent">
-  <h1>La saisie n'est pas ouverte.</h1>
-  <p>La campagne « {{ reponse.campagne.nom }} » est ouverte du {{ reponse.campagne.date_ouverture|date:"j F Y" }} au {{ reponse.campagne.date_cloture|date:"j F Y" }}.</p>
-  <p class="discret">Si vous avez besoin d'un délai, contactez l'administration de tutelle.</p>
-</div></main>
-{% endblock %}

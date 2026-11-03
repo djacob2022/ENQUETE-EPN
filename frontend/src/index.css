@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Thème : couleurs en triplets RGB pour permettre les opacités Tailwind (bg-marque/10…). */
+:root {
+  --fond: 246 247 249;
+  --surface: 255 255 255;
+  --relief: 241 243 246;
+  --encre: 11 27 51;
+  --discret: 84 99 122;
+  --trait: 226 231 238;
+  --marque: 30 86 160;
+  --marque-fonce: 18 58 107;
+  --marque-doux: 231 239 250;
+  --succes: 13 118 82;
+  --succes-doux: 226 244 236;
+  --alerte: 166 77 8;
+  --alerte-doux: 254 243 226;
+  --danger: 190 48 38;
+  --danger-doux: 253 236 234;
+  color-scheme: light;
+}
+.dark {
+  --fond: 8 13 23;
+  --surface: 14 21 34;
+  --relief: 21 30 46;
+  --encre: 232 237 246;
+  --discret: 150 165 187;
+  --trait: 34 46 66;
+  --marque: 104 152 236;
+  --marque-fonce: 150 184 244;
+  --marque-doux: 24 39 68;
+  --succes: 60 202 145;
+  --succes-doux: 15 46 36;
+  --alerte: 246 170 50;
+  --alerte-doux: 54 37 12;
+  --danger: 248 118 106;
+  --danger-doux: 58 22 20;
+  color-scheme: dark;
+}
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { @apply bg-fond text-encre font-sans text-[15px] leading-relaxed; font-feature-settings: "ss01", "cv11"; }
+  ::selection { background: rgb(var(--marque) / 0.18); }
+  :focus-visible { outline: 2px solid rgb(var(--marque)); outline-offset: 2px; border-radius: 6px; }
+  input[type="number"]::-webkit-inner-spin-button { opacity: .4; }
+}
+
+@layer components {
+  .chiffres { font-variant-numeric: tabular-nums; }
+  .titre-display { @apply font-display tracking-tight; font-weight: 400; }
+  .grille-fond {
+    background-image:
+      linear-gradient(rgb(var(--trait) / .55) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--trait) / .55) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse at top, black 30%, transparent 75%);
+  }
+  .defilement-fin::-webkit-scrollbar { width: 10px; height: 10px; }
+  .defilement-fin::-webkit-scrollbar-thumb { background: rgb(var(--trait)); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+}
+
+@media print {
+  .pas-imprimer { display: none !important; }
+  body { background: white; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

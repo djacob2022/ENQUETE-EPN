@@ -66,7 +66,6 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "enquete.context_processors.institution",
             ],
         },
     },
@@ -108,6 +107,8 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Fichiers construits par Vite (frontend/dist/assets → /static/assets/…).
+STATICFILES_DIRS = [p for p in [BASE_DIR / "frontend" / "dist"] if p.exists()]
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
@@ -124,9 +125,8 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 10
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "gestion:tableau_de_bord"
-LOGOUT_REDIRECT_URL = "login"
+# CSRF : le jeton est lu dans le cookie par l'interface React et renvoyé dans l'en-tête X-CSRFToken.
+CSRF_COOKIE_HTTPONLY = False
 SESSION_COOKIE_AGE = 60 * 60 * 8
 
 # E-mails : SMTP configurable ; en développement, Mailpit (voir docker-compose.yml).
