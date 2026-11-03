@@ -188,10 +188,12 @@ def filtrer(params, qs):
     return qs
 
 
-def historique():
+def historique(tutelles=None):
+    dans = Q(reponses__epn__tutelle__in=tutelles) if tutelles else Q()
     lignes = []
     for c in Campagne.objects.order_by("exercice").annotate(
-        total=Count("reponses"), soumis=Count("reponses", filter=Q(reponses__statut=Reponse.Statut.SOUMIS))
+        total=Count("reponses", filter=dans),
+        soumis=Count("reponses", filter=dans & Q(reponses__statut=Reponse.Statut.SOUMIS)),
     ).filter(total__gt=0):
         lignes.append({"libelle": str(c.exercice), "taux": round(100 * c.soumis / c.total) if c.total else 0})
     return lignes

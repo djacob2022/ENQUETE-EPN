@@ -1,0 +1,15 @@
+Madame, Monsieur,
+
+Le lien d'accès au questionnaire « {{ campagne.nom }} » de {{ reponse.epn.nom }} a été remplacé par l'administration. L'ancien lien ne fonctionne plus.
+
+Voici le nouveau lien de votre établissement :
+{{ reponse.lien }}
+
+Les réponses déjà saisies sont conservées : vous reprenez là où vous vous étiez arrêté.
+
+Date limite d'envoi : {{ campagne.date_cloture|date:"j F Y" }}.
+
+Ce lien est propre à votre établissement : merci de ne pas le diffuser.
+
+Cordialement,
+{{ institution }}

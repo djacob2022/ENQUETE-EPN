@@ -124,6 +124,20 @@ npm run dev                          # interface sur http://localhost:5173 (rela
 
 Tests de l'API : `DJANGO_DEBUG=1 python manage.py test enquete`. Vérification des types de l'interface : `cd frontend && npm run typecheck`.
 
+## Comptes de l'équipe et périmètre
+
+Un compte peut être limité aux établissements d'une ou plusieurs tutelles : il ne voit, n'exporte et ne relance que ceux-là. Un compte sans limite (administrateur d'enquête) voit tout, et lui seul crée les campagnes et importe les EPN.
+
+```bash
+docker compose exec web python manage.py compte_equipe f.kone --nom "Fatou Koné" --tutelle "Santé" --tutelle "Éducation"
+```
+
+Le mot de passe est demandé à l'écran. Le périmètre se modifie aussi dans `/django-admin/`, sur la fiche de l'utilisateur.
+
+## Lien compromis
+
+Si le lien d'un établissement a été transmis à une mauvaise personne, ouvrez sa fiche (**Réponses**) puis cliquez sur **Remplacer le lien**. L'ancien lien cesse aussitôt de fonctionner, et les réponses déjà saisies sont conservées. Le nouveau lien peut être envoyé directement au point focal.
+
 ## Importer les EPN
 
 Menu **Répertoire des EPN** → fichier `.xlsx` avec, dans cet ordre : Dénomination, Sigle, Catégorie (EPA/EPIC/AUTRE), Tutelle, Région, E-mail du point focal. La première ligne contient les en-têtes.

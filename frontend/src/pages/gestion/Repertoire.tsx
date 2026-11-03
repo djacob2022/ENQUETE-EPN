@@ -4,10 +4,11 @@ import { useMemo, useRef, useState } from "react";
 import { api, envoyerFichier, ErreurApi } from "@/lib/api";
 import { EPN } from "@/lib/types";
 import { Badge, Carte, cx, Squelette, useToast, Vide } from "@/ui";
-import { EnTetePage } from "./Gestion";
+import { EnTetePage, useGestion } from "./Gestion";
 
 export default function Repertoire() {
   const client = useQueryClient();
+  const { moi } = useGestion();
   const toast = useToast();
   const champ = useRef<HTMLInputElement>(null);
   const [recherche, setRecherche] = useState("");
@@ -38,8 +39,10 @@ export default function Repertoire() {
 
   return (
     <>
-      <EnTetePage titre="Répertoire des EPN" sous={`${q.data?.epn.length ?? "…"} établissements · la liste qui reçoit les liens de chaque campagne`} />
-      <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
+      <EnTetePage titre="Répertoire des EPN" sous={moi.perimetre
+        ? `${q.data?.epn.length ?? "…"} établissements de votre périmètre : ${moi.perimetre.join(", ")}`
+        : `${q.data?.epn.length ?? "…"} établissements · la liste qui reçoit les liens de chaque campagne`} />
+      <div className={cx("grid gap-6", moi.administrateur && "xl:grid-cols-[1fr_340px]")}>
         <Carte className="overflow-hidden">
           <div className="border-b border-trait p-4">
             <label className="relative block">
@@ -70,6 +73,7 @@ export default function Repertoire() {
           </div>
         </Carte>
 
+        {moi.administrateur && (
         <div className="space-y-4">
           <Carte className="p-5">
             <h2 className="font-semibold tracking-tight">Importer depuis Excel</h2>
@@ -101,6 +105,7 @@ export default function Repertoire() {
             </ol>
           </Carte>
         </div>
+        )}
       </div>
     </>
   );

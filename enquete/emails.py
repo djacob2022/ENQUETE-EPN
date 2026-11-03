@@ -59,6 +59,13 @@ def envoyer_acces(reponse):
     return ok
 
 
+def envoyer_nouveau_lien(reponse, par=""):
+    """Le lien a été remplacé : le nouveau part à l'adresse officielle du point focal uniquement."""
+    return _envoyer(reponse, Envoi.Type.NOUVEAU_LIEN, "nouveau_lien",
+                    f"[{reponse.campagne}] Nouveau lien d'accès au questionnaire de {reponse.epn.nom}",
+                    par=par, destinataires=[reponse.epn.email_contact])
+
+
 def envoyer_relance(reponse, par=""):
     if reponse.statut == Reponse.Statut.SOUMIS:
         return False

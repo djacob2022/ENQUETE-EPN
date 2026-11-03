@@ -128,4 +128,4 @@ export interface Statistiques {
   historique: { libelle: string; taux: number }[];
 }
 
-export interface Moi { identifiant: string; nom: string; superutilisateur: boolean }
+export interface Moi { identifiant: string; nom: string; superutilisateur: boolean; perimetre: string[] | null; administrateur: boolean }

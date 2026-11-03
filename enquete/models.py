@@ -1,5 +1,6 @@
 import secrets
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -130,6 +131,11 @@ class Reponse(models.Model):
     def repondant(self):
         return f"{self.prenom} {self.nom}".strip()
 
+    def remplacer_lien(self):
+        """Nouveau jeton : l'ancien lien cesse immédiatement de fonctionner (lien transféré, ancien agent…)."""
+        self.jeton = nouveau_jeton()
+        self.save(update_fields=["jeton", "date_modification"])
+
     def avancement(self):
         from .questionnaire import MODULES
 
@@ -151,6 +157,37 @@ class EchecConnexion(models.Model):
     date = models.DateTimeField(auto_now_add=True, db_index=True)
 
 
+class ProfilEquipe(models.Model):
+    """Périmètre d'un compte de l'équipe : les tutelles dont il voit les établissements.
+
+    Sans profil, ou avec une liste vide, le compte voit tout (administrateur d'enquête).
+    """
+
+    utilisateur = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profil_equipe")
+    tutelles = models.CharField(
+        "tutelles", max_length=1000, blank=True,
+        help_text="Tutelles techniques visibles, séparées par des virgules (ex. « Santé, Éducation »). "
+                  "Vide = tous les établissements.")
+
+    class Meta:
+        verbose_name = "profil d'équipe"
+
+    def __str__(self):
+        return f"{self.utilisateur} · {self.tutelles or 'toutes tutelles'}"
+
+    @property
+    def liste_tutelles(self):
+        return [t.strip() for t in self.tutelles.split(",") if t.strip()]
+
+
+def tutelles_autorisees(user):
+    """None = accès à tous les établissements ; sinon la liste des tutelles visibles."""
+    if user.is_superuser:
+        return None
+    profil = getattr(user, "profil_equipe", None)  # l'absence de profil lève une AttributeError, rattrapée ici
+    return (profil.liste_tutelles or None) if profil else None
+
+
 class Envoi(models.Model):
     """Journal des e-mails envoyés (invitations et relances)."""
 
@@ -159,6 +196,7 @@ class Envoi(models.Model):
         RELANCE = "relance", "Relance"
         ACCUSE = "accuse", "Accusé de réception"
         ACCES = "acces", "Lien demandé via le formulaire public"
+        NOUVEAU_LIEN = "nouveau_lien", "Nouveau lien (l'ancien est révoqué)"
 
     reponse = models.ForeignKey(Reponse, on_delete=models.CASCADE, related_name="envois")
     type = models.CharField(max_length=12, choices=Type.choices)

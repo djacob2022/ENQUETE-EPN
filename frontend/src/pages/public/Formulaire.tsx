@@ -53,7 +53,7 @@ export default function Formulaire() {
       <PageSimple icone={introuvable ? <Link2Off /> : <CloudOff />}
         titre={introuvable ? "Ce lien n'est pas valide" : "Connexion impossible"}
         texte={introuvable
-          ? "Vérifiez que vous avez copié le lien complet reçu par e-mail. Il est personnel à votre établissement."
+          ? "Vérifiez que vous avez copié le lien complet. S'il a été remplacé par l'administration, utilisez le dernier lien reçu par e-mail, ou demandez-en un nouveau sur la page du questionnaire."
           : (rq.error as Error).message} />
     );
   }

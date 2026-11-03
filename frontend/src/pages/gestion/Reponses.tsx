@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDownUp, BellRing, Check, Copy, Download, ExternalLink, FileArchive, FileText, Inbox, Mail, Phone, RotateCcw, Search, Send,
+  ArrowDownUp, BellRing, Check, Copy, Download, ExternalLink, FileArchive, FileText, Inbox, KeyRound, Mail, Phone, RotateCcw, Search, Send,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -8,7 +8,7 @@ import { api, avecParams, ErreurApi } from "@/lib/api";
 import { copier } from "@/lib/presse-papiers";
 import { date, ilYa, taille } from "@/lib/format";
 import { ReponseDetail, ReponseResume, Statut } from "@/lib/types";
-import { BadgeStatut, Bouton, Carte, cx, Liste, Progression, Squelette, Tiroir, useToast, Vide } from "@/ui";
+import { BadgeStatut, Bouton, Carte, cx, Dialogue, Liste, Progression, Squelette, Tiroir, useToast, Vide } from "@/ui";
 import { EnTetePage, SansCampagne, useGestion } from "./Gestion";
 
 type Tri = "epn" | "tutelle" | "avancement" | "date";
@@ -131,10 +131,13 @@ function DetailReponse({ id }: { id: number }) {
   const toast = useToast();
   const [onglet, setOnglet] = useState<"reponses" | "pieces" | "historique">("reponses");
   const [copie, setCopie] = useState(false);
+  const [remplacer, setRemplacer] = useState(false);
+  const [envoyerNouveau, setEnvoyerNouveau] = useState(true);
   const q = useQuery({ queryKey: ["reponse-detail", id], queryFn: () => api.get<ReponseDetail>(`/api/gestion/reponses/${id}/`) });
   const action = useMutation({
-    mutationFn: (a: "relancer" | "inviter" | "rouvrir") => api.post<{ message: string; reponse: ReponseDetail }>(`/api/gestion/reponses/${id}/${a}/`),
-    onSuccess: (r) => { client.setQueryData(["reponse-detail", id], r.reponse); client.invalidateQueries({ queryKey: ["reponses"] }); client.invalidateQueries({ queryKey: ["tableau"] }); toast("succes", r.message); },
+    mutationFn: (a: "relancer" | "inviter" | "rouvrir" | "remplacer-lien") =>
+      api.post<{ message: string; reponse: ReponseDetail }>(`/api/gestion/reponses/${id}/${a}/`, a === "remplacer-lien" ? { envoyer: envoyerNouveau } : {}),
+    onSuccess: (r) => { setRemplacer(false); client.setQueryData(["reponse-detail", id], r.reponse); client.invalidateQueries({ queryKey: ["liens"] }); client.invalidateQueries({ queryKey: ["reponses"] }); client.invalidateQueries({ queryKey: ["tableau"] }); toast("succes", r.message); },
     onError: (e: ErreurApi) => toast("erreur", e.message),
   });
 
@@ -148,6 +151,7 @@ function DetailReponse({ id }: { id: number }) {
   };
 
   return (
+    <>
     <div>
       <div className="border-b border-trait bg-surface px-6 pb-5 pt-4">
         <div className="flex flex-wrap items-center gap-2"><BadgeStatut statut={r.statut} /><span className="text-xs text-discret">{r.epn.categorie} · {r.epn.tutelle}</span></div>
@@ -162,6 +166,7 @@ function DetailReponse({ id }: { id: number }) {
               </>}
           <Bouton taille="sm" icone={copie ? <Check className="h-3.5 w-3.5 text-succes" /> : <Copy className="h-3.5 w-3.5" />} onClick={copierLien}>{copie ? "Lien copié" : "Copier le lien"}</Bouton>
           <a href={r.lien} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-2 rounded-[10px] px-3 text-[13px] font-medium text-discret hover:bg-relief hover:text-encre"><ExternalLink className="h-3.5 w-3.5" /> Ouvrir le formulaire</a>
+          <Bouton taille="sm" variante="fantome" icone={<KeyRound className="h-3.5 w-3.5" />} onClick={() => setRemplacer(true)} className="text-danger hover:text-danger">Remplacer le lien</Bouton>
         </div>
       </div>
 
@@ -234,5 +239,21 @@ function DetailReponse({ id }: { id: number }) {
         ))}
       </div>
     </div>
+      <Dialogue ouvert={remplacer} fermer={() => setRemplacer(false)} titre={`Remplacer le lien de ${r.epn.nom} ?`}
+        description="À utiliser si le lien a été transmis à une mauvaise personne ou si un agent a quitté l'établissement.">
+        <ul className="space-y-2 text-sm">
+          <li className="flex gap-2"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-danger" /><span>L'ancien lien cesse de fonctionner <strong>immédiatement</strong>, pour tout le monde.</span></li>
+          <li className="flex gap-2"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-succes" /><span>Les réponses déjà saisies et les pièces jointes sont conservées.</span></li>
+        </ul>
+        <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-trait p-3 text-sm">
+          <input type="checkbox" checked={envoyerNouveau} onChange={(e) => setEnvoyerNouveau(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[rgb(var(--marque))]" />
+          <span>Envoyer le nouveau lien au point focal<span className="block text-xs text-discret">{r.epn.email_contact}</span></span>
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <Bouton variante="fantome" onClick={() => setRemplacer(false)}>Garder le lien actuel</Bouton>
+          <Bouton variante="danger" chargement={action.isPending && action.variables === "remplacer-lien"} onClick={() => action.mutate("remplacer-lien")}>Remplacer le lien</Bouton>
+        </div>
+      </Dialogue>
+    </>
   );
 }

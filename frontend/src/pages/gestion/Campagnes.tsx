@@ -11,7 +11,7 @@ type Brouillon = { nom: string; exercice: string; date_ouverture: string; date_c
 const vide: Brouillon = { nom: "", exercice: String(new Date().getFullYear() - 1), date_ouverture: "", date_cloture: "", active: true };
 
 export default function Campagnes() {
-  const { choisirCampagne } = useGestion();
+  const { choisirCampagne, moi } = useGestion();
   const client = useQueryClient();
   const toast = useToast();
   const [edition, setEdition] = useState<{ id?: number; valeurs: Brouillon } | null>(null);
@@ -40,7 +40,7 @@ export default function Campagnes() {
   return (
     <>
       <EnTetePage titre="Campagnes" sous="Une campagne = un exercice de référence et une période de collecte. Une seule est active à la fois."
-        actions={<Bouton variante="primaire" icone={<Plus className="h-4 w-4" />} onClick={() => ouvrir()}>Nouvelle campagne</Bouton>} />
+        actions={moi.administrateur && <Bouton variante="primaire" icone={<Plus className="h-4 w-4" />} onClick={() => ouvrir()}>Nouvelle campagne</Bouton>} />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {q.isLoading && [0, 1, 2].map((i) => <Squelette key={i} className="h-44 rounded-2xl" />)}
         {q.data?.campagnes.map((c) => {
@@ -56,7 +56,7 @@ export default function Campagnes() {
                 <div className="mb-1.5 flex justify-between text-xs text-discret"><span>{c.soumis} / {c.total} réponses</span><span className="chiffres font-medium text-encre">{taux} %</span></div>
                 <Progression valeur={taux} ton={taux === 100 ? "succes" : "marque"} />
               </div>
-              <Bouton taille="sm" variante="fantome" className="mt-4 self-start" icone={<Pencil className="h-3.5 w-3.5" />} onClick={() => ouvrir(c)}>Modifier</Bouton>
+              {moi.administrateur && <Bouton taille="sm" variante="fantome" className="mt-4 self-start" icone={<Pencil className="h-3.5 w-3.5" />} onClick={() => ouvrir(c)}>Modifier</Bouton>}
             </Carte>
           );
         })}

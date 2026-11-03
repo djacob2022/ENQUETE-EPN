@@ -118,6 +118,11 @@ function Coque({ children }: { children: React.ReactNode }) {
           className="h-10 w-full cursor-pointer rounded-[10px] border border-trait bg-relief/60 px-3 text-sm font-medium focus:border-marque focus:outline-none">
           {options.campagnes.map((c) => <option key={c.id} value={c.id}>{c.nom}{c.active ? " · active" : ""}</option>)}
         </select>
+        {moi.perimetre && (
+          <p className="mt-2 rounded-lg bg-accent-doux px-3 py-2 text-xs text-accent-fonce">
+            <strong className="block font-semibold">Votre périmètre</strong>{moi.perimetre.join(", ")}
+          </p>
+        )}
       </div>
       <button onClick={() => setPalette(true)}
         className="mx-3 mt-3 flex h-10 items-center gap-2 rounded-[10px] border border-trait px-3 text-sm text-discret transition hover:bg-relief">
@@ -137,7 +142,12 @@ function Coque({ children }: { children: React.ReactNode }) {
       </nav>
       <div className="m-3 flex items-center gap-3 rounded-xl border border-trait p-3">
         <Avatar texte={initiales(moi.nom)} />
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{moi.nom}</p><p className="text-xs text-discret">Administration</p></div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{moi.nom}</p>
+          <p className="truncate text-xs text-discret" title={moi.perimetre?.join(", ")}>
+            {moi.perimetre ? `Superviseur · ${moi.perimetre.join(", ")}` : "Administrateur d'enquête"}
+          </p>
+        </div>
         <BoutonTheme />
         <Bouton variante="fantome" taille="sm" onClick={deconnecter} aria-label="Se déconnecter"><LogOut className="h-4 w-4" /></Bouton>
       </div>

@@ -418,3 +418,81 @@ class SecuriteTests(Base):
         bloc = compose[compose.index("  mailpit:"):compose.index("  backup:")]
         self.assertIn('profiles: ["dev"]', bloc)
         self.assertIn('"127.0.0.1:8025:8025"', bloc)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", SITE_URL="http://testserver",
+                   MEDIA_ROOT=MEDIA_TEST)
+class PerimetreEtRevocationTests(Base):
+    def setUp(self):
+        super().setUp()
+        from enquete.models import ProfilEquipe
+        self.autre = EPN.objects.create(nom="Hôpital", tutelle="Santé", email_contact="sante@epn.test")
+        self.r_agri = Reponse.objects.create(campagne=self.campagne, epn=self.epn, statut=Reponse.Statut.SOUMIS,
+                                             date_soumission=timezone.now(), donnees={"D01": 10})
+        self.r_sante = Reponse.objects.create(campagne=self.campagne, epn=self.autre, statut=Reponse.Statut.SOUMIS,
+                                              date_soumission=timezone.now(), donnees={"D01": 99})
+        self.superviseur = User.objects.create_user("sup", password="motdepasse-solide", is_staff=True)
+        ProfilEquipe.objects.create(utilisateur=self.superviseur, tutelles="Agriculture")
+
+    def test_superviseur_limite_a_sa_tutelle(self):
+        self.client.force_login(self.superviseur)
+        moi = self.client.get(reverse("api:moi")).json()
+        self.assertEqual((moi["perimetre"], moi["administrateur"]), (["Agriculture"], False))
+        noms = [r["epn"]["nom"] for r in self.client.get(reverse("api:reponses")).json()["reponses"]]
+        self.assertEqual(noms, ["Office test"])
+        self.assertEqual(self.client.get(reverse("api:reponse_detail", args=[self.r_sante.pk])).status_code, 404)
+        self.assertEqual(self.post("api:reponse_action", [self.r_sante.pk, "rouvrir"]).status_code, 404)
+        self.assertEqual(self.client.get(reverse("api:tableau_de_bord")).json()["effectif_total"], 10)
+        self.assertEqual(self.client.get(reverse("api:statistiques")).json()["n"], 1)
+        self.assertEqual(self.client.get(reverse("api:options")).json()["tutelles"], ["Agriculture"])
+        self.assertEqual([e["nom"] for e in self.client.get(reverse("api:epn")).json()["epn"]], ["Office test"])
+        ws = load_workbook(BytesIO(self.client.get(reverse("api:export")).content))["Réponses"]
+        self.assertEqual([c.value for c in ws["A"]][1:], ["Office test"])
+        self.assertEqual(self.client.get(reverse("api:pieces_zip", args=[self.r_sante.pk])).status_code, 404)
+        self.assertEqual([c["total"] for c in self.client.get(reverse("api:campagnes")).json()["campagnes"]], [1])
+
+    def test_superviseur_ne_peut_pas_agir_hors_perimetre(self):
+        EPN.objects.create(nom="Clinique", tutelle="Santé", email_contact="clinique@epn.test")
+        self.client.force_login(self.superviseur)
+        self.post("api:liens", donnees={"envoyer": True})
+        self.assertFalse(Reponse.objects.filter(epn__nom="Clinique").exists())  # pas de lien créé hors périmètre
+        self.assertTrue(all("sante" not in ",".join(m.to) and "clinique" not in ",".join(m.to) for m in mail.outbox))
+        resp = self.post("api:campagnes", donnees={"nom": "X", "exercice": 2025, "date_ouverture": "2026-03-01",
+                                                   "date_cloture": "2026-03-31", "active": False})
+        self.assertEqual(resp.status_code, 403)
+        resp = self.client.post(reverse("api:epn"), {"fichier": SimpleUploadedFile("e.xlsx", b"x")})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_administrateur_sans_profil_voit_tout(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(len(self.client.get(reverse("api:reponses")).json()["reponses"]), 2)
+        self.assertTrue(self.client.get(reverse("api:moi")).json()["administrateur"])
+
+    def test_remplacer_le_lien(self):
+        ancien = self.r_agri.jeton
+        self.client.force_login(self.admin)
+        resp = self.post("api:reponse_action", [self.r_agri.pk, "remplacer-lien"], {"envoyer": True})
+        self.assertEqual(resp.status_code, 200)
+        self.r_agri.refresh_from_db()
+        self.assertNotEqual(self.r_agri.jeton, ancien)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("api:reponse", args=[ancien])).status_code, 404)  # ancien lien mort
+        nouveau = self.client.get(reverse("api:reponse", args=[self.r_agri.jeton])).json()
+        self.assertEqual(nouveau["donnees"], {"D01": 10})  # réponses conservées
+        self.assertEqual(mail.outbox[-1].to, ["focal@epn.test"])
+        self.assertIn(self.r_agri.lien, mail.outbox[-1].body)
+        self.assertNotIn(ancien, mail.outbox[-1].body)
+
+    def test_remplacer_le_lien_sans_envoi(self):
+        self.client.force_login(self.admin)
+        self.post("api:reponse_action", [self.r_agri.pk, "remplacer-lien"], {"envoyer": False})
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_commande_compte_equipe(self):
+        sortie = StringIO()
+        call_command("compte_equipe", "sup2", "--tutelle", "Santé", "--tutelle", "Éducation",
+                     "--mot-de-passe", "un-mot-de-passe-solide", stdout=sortie)
+        from enquete.models import tutelles_autorisees
+        u = User.objects.get(username="sup2")
+        self.assertTrue(u.is_staff)
+        self.assertEqual(tutelles_autorisees(u), ["Santé", "Éducation"])
