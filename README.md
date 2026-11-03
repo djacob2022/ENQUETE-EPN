@@ -90,6 +90,10 @@ Services : `web` (Django + Gunicorn), `db` (PostgreSQL 16), `mailpit` (e-mails d
 
 ### Mise en production
 
+**Guide complet : [`docs/MISE_EN_LIGNE.md`](docs/MISE_EN_LIGNE.md).** Sur un serveur Ubuntu, une commande suffit : `sudo sh deploiement/installer.sh`. Elle installe Docker, configure le pare-feu, crée la configuration de production et démarre le site en HTTPS (Caddy et Let's Encrypt). Les mises à jour et restaurations se font avec `deploiement/mettre-a-jour.sh` et `deploiement/restaurer.sh`.
+
+Pour une installation manuelle :
+
 - `DJANGO_DEBUG=0`, une `DJANGO_SECRET_KEY` longue et aléatoire, `DJANGO_ALLOWED_HOSTS` et `SITE_URL` = le domaine réel.
 - Placer un proxy HTTPS (Nginx, Traefik…) devant le port 8000, puis `COOKIES_SECURE=1` et `NB_PROXYS_DE_CONFIANCE=1`. Ce dernier réglage permet à la limite anti-abus du lien unique de reconnaître chaque visiteur, et non le seul proxy.
 - Renseigner le serveur SMTP réel (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, identifiants) et démarrer **sans** `--profile dev` (Mailpit reste arrêté) : `docker compose up -d --build`.
@@ -150,3 +154,4 @@ Menu **Répertoire des EPN** → fichier `.xlsx` avec, dans cet ordre : Dénomin
 ## Documents
 
 - `docs/Cahier_des_charges_ENQUETE-EPN.docx` : cahier des charges.
+- `docs/MISE_EN_LIGNE.md` : mise en ligne sur un serveur.

@@ -77,6 +77,19 @@ def csrf(request):
 
 
 @require_GET
+def sante(request):
+    """Contrôle de santé (Docker, supervision) : l'application répond et la base de données est joignable."""
+    from django.db import connection
+
+    try:
+        with connection.cursor() as curseur:
+            curseur.execute("SELECT 1")
+    except Exception:
+        return JsonResponse({"etat": "base de données injoignable"}, status=503)
+    return JsonResponse({"etat": "ok"})
+
+
+@require_GET
 def config(request):
     """Identité officielle affichée dans l'en-tête (réglée dans .env)."""
     return JsonResponse({"pays": settings.PAYS, "devise": settings.DEVISE, "ministere": settings.NOM_MINISTERE,

@@ -8,6 +8,7 @@ urlpatterns = [
     path("csrf/", api.csrf, name="csrf"),
     path("questionnaire/", api.questionnaire, name="questionnaire"),
     path("config/", api.config, name="config"),
+    path("sante/", api.sante, name="sante"),
     path("formulaire/", api.formulaire_public, name="formulaire_public"),
     # Parcours du répondant
     path("r/<str:jeton>/", api.reponse, name="reponse"),

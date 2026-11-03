@@ -28,7 +28,7 @@ USER app
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/csrf/')" || exit 1
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/sante/', timeout=4)" || exit 1
 
 ENTRYPOINT ["docker/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--config", "docker/gunicorn.conf.py"]

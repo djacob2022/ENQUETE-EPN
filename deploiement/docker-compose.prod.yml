@@ -1,0 +1,31 @@
+# Surcouche de production : à utiliser avec le docker-compose.yml principal (chemins relatifs à la racine du projet).
+#   docker compose -f docker-compose.yml -f deploiement/docker-compose.prod.yml up -d --build
+# Le script deploiement/installer.sh et deploiement/mettre-a-jour.sh le font pour vous.
+services:
+  web:
+    environment:
+      # Imposés en production, quel que soit le contenu de .env.
+      DJANGO_DEBUG: "0"
+      COOKIES_SECURE: "1"
+      REDIRECTION_HTTPS: "1"
+      NB_PROXYS_DE_CONFIANCE: "1"
+      CHARGER_DONNEES_DEMO: "0"
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    env_file: .env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploiement/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

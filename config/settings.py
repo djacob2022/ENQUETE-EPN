@@ -25,7 +25,8 @@ if not SECRET_KEY:
     else:
         raise RuntimeError("DJANGO_SECRET_KEY doit être défini quand DJANGO_DEBUG=0.")
 
-ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+# localhost reste toujours autorisé : il sert au contrôle de santé interne du conteneur.
+ALLOWED_HOSTS = sorted(set(env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")) | {"localhost", "127.0.0.1"})
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 # Adresse publique utilisée pour construire les liens envoyés par e-mail.
@@ -157,6 +158,7 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "ENQUETE-EPN <no-reply
 SECURE_HSTS_SECONDS = int(os.environ.get("HSTS_SECONDES", "31536000" if SITE_URL.startswith("https://") else "0"))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("HSTS_SOUS_DOMAINES", False)
 SECURE_SSL_REDIRECT = env_bool("REDIRECTION_HTTPS", False)
+SECURE_REDIRECT_EXEMPT = [r"^api/sante/$"]  # contrôle de santé interne, en http
 SILENCED_SYSTEM_CHECKS = ["security.W004"] if SITE_URL.startswith("http://") else []
 
 if not DEBUG:

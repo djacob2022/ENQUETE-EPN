@@ -545,3 +545,12 @@ class DurcissementTests(Base):
         exemple = (Path(__file__).resolve().parents[2] / ".env.example").read_text(encoding="utf-8")
         self.assertIn("\nCOOKIES_SECURE=1", exemple)
         self.assertIn("\nCHARGER_DONNEES_DEMO=0", exemple)
+
+
+class SanteTests(TestCase):
+    @override_settings(SECURE_SSL_REDIRECT=True, ALLOWED_HOSTS=["enquete.example", "localhost"])
+    def test_point_de_sante_en_http_meme_avec_redirection_https(self):
+        resp = self.client.get(reverse("api:sante"), HTTP_HOST="localhost")
+        self.assertEqual((resp.status_code, resp.json()), (200, {"etat": "ok"}))
+        # Le reste du site est bien redirigé vers https.
+        self.assertEqual(self.client.get(reverse("api:config"), HTTP_HOST="enquete.example").status_code, 301)
