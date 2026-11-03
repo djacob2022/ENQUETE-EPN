@@ -143,6 +143,14 @@ class DemandeAcces(models.Model):
     date = models.DateTimeField(auto_now_add=True, db_index=True)
 
 
+class EchecConnexion(models.Model):
+    """Un mot de passe erroné : sert au blocage temporaire contre la force brute."""
+
+    identifiant = models.CharField(max_length=150, db_index=True)
+    ip = models.GenericIPAddressField(db_index=True)
+    date = models.DateTimeField(auto_now_add=True, db_index=True)
+
+
 class Envoi(models.Model):
     """Journal des e-mails envoyés (invitations et relances)."""
 

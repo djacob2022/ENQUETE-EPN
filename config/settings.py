@@ -52,6 +52,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "enquete.securite.LimiteTailleRequete",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -99,6 +100,12 @@ else:
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
+
+# Blocage temporaire après des mots de passe erronés répétés (API et /django-admin/).
+AUTHENTICATION_BACKENDS = ["enquete.securite.AuthentificationProtegee"]
+
+# Plus gros envoi accepté : une pièce jointe de 10 Mo plus l'enveloppe de la requête.
+TAILLE_MAX_REQUETE = 12 * 1024 * 1024
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -155,6 +162,8 @@ if not DEBUG:
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    # Les liens personnels (/r/<jeton>/) n'apparaissent jamais en clair dans les journaux.
+    "filters": {"jetons": {"()": "enquete.journaux.FiltreJetons"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "filters": ["jetons"]}},
     "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
 }

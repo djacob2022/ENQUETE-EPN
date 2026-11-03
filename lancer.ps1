@@ -19,8 +19,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 $ErrorActionPreference = "Stop"
 
-if ($action -eq "arreter") { docker compose stop; exit }
-if ($action -eq "effacer") { docker compose down -v; exit }
+if ($action -eq "arreter") { docker compose --profile dev stop; exit }
+if ($action -eq "effacer") { docker compose --profile dev down -v; exit }
 
 function Aleatoire([int]$n) { -join ((48..57) + (65..90) + (97..122) | Get-Random -Count $n | ForEach-Object { [char]$_ }) }
 
@@ -34,7 +34,7 @@ if (-not (Test-Path .env)) {
   Write-Host "Fichier .env cree. Identifiants administrateur : admin / $mdpAdmin (notez-les)." -ForegroundColor Green
 }
 
-docker compose up -d --build
+docker compose --profile dev up -d --build
 Write-Host ""
 Write-Host "Patientez une vingtaine de secondes au premier lancement, puis ouvrez :"
 Write-Host "  Espace administrateur : http://localhost:8000/connexion/  (identifiants dans .env)"

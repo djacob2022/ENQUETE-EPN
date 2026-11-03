@@ -1,6 +1,7 @@
 # ENQUÊTE-EPN – déploiement Docker.
 #   cp .env.example .env   (puis modifier les mots de passe)
 #   docker compose up -d --build
+# Test sur un poste : docker compose --profile dev up -d --build   (ajoute Mailpit, les e-mails de test)
 # Application : http://localhost:8000   ·   E-mails de test (Mailpit) : http://localhost:8025
 services:
   web:
@@ -33,10 +34,13 @@ services:
 
   # Serveur e-mail de test : capture tous les e-mails (invitations, relances) sans les envoyer.
   # En production, supprimez ce service et renseignez le SMTP réel dans .env.
+  # Il conserve tous les e-mails, liens personnels compris : accessible depuis ce poste seulement, et
+  # démarré uniquement avec le profil « dev » (docker compose --profile dev up), jamais en production.
   mailpit:
     image: axllent/mailpit:v1.21
+    profiles: ["dev"]
     ports:
-      - "8025:8025"
+      - "127.0.0.1:8025:8025"
     restart: unless-stopped
 
   # Sauvegarde quotidienne de la base et des pièces jointes, conservée 30 jours dans le volume « backups ».

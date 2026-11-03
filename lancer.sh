@@ -12,8 +12,8 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 case "$1" in
-  arreter) docker compose stop; exit 0 ;;
-  effacer) docker compose down -v; exit 0 ;;
+  arreter) docker compose --profile dev stop; exit 0 ;;
+  effacer) docker compose --profile dev down -v; exit 0 ;;
 esac
 
 if [ ! -f .env ]; then
@@ -26,7 +26,7 @@ if [ ! -f .env ]; then
   echo "Fichier .env créé. Identifiants administrateur : admin / $MDP_ADMIN (notez-les)."
 fi
 
-docker compose up -d --build
+docker compose --profile dev up -d --build
 echo
 echo "Patientez une vingtaine de secondes au premier lancement, puis ouvrez :"
 echo "  Espace administrateur : http://localhost:8000/connexion/  (identifiants dans .env)"

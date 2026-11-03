@@ -13,10 +13,10 @@ from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from . import export_excel, serializers, services, statistiques
+from . import export_excel, securite, serializers, services, statistiques
 from .emails import envoyer_acces, envoyer_invitation, envoyer_relance
 from .forms import CampagneForm, IdentificationForm, ImportEPNForm
-from .models import EPN, Campagne, DemandeAcces, Envoi, PieceJointe, Reponse, lien_public
+from .models import EPN, Campagne, Envoi, PieceJointe, Reponse, lien_public
 from .services import Refus
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -89,28 +89,6 @@ def _masquer(email):
     return f"{nom[:1]}•••@{domaine}"
 
 
-def _ip_client(request):
-    """Adresse du visiteur ; derrière N proxys de confiance, la N-ième en partant de la fin de X-Forwarded-For."""
-    n = settings.NB_PROXYS_DE_CONFIANCE
-    chaine = [x.strip() for x in request.META.get("HTTP_X_FORWARDED_FOR", "").split(",") if x.strip()]
-    if n and len(chaine) >= n:
-        return chaine[-n]
-    return request.META.get("REMOTE_ADDR", "0.0.0.0")
-
-
-def _trop_de_demandes(request, limite=10, fenetre=timedelta(minutes=10)):
-    """Au plus `limite` demandes de lien par adresse IP sur la fenêtre glissante.
-
-    Chaque demande est une ligne en base : le compte est partagé entre les processus du serveur, survit aux
-    redémarrages, et deux demandes simultanées ne peuvent pas « perdre » une incrémentation.
-    """
-    debut = timezone.now() - fenetre
-    DemandeAcces.objects.filter(date__lt=debut).delete()
-    ip = _ip_client(request)
-    DemandeAcces.objects.create(ip=ip)
-    return DemandeAcces.objects.filter(ip=ip, date__gte=debut).count() > limite
-
-
 @require_http_methods(["GET", "POST"])
 @api
 def formulaire_public(request):
@@ -127,7 +105,7 @@ def formulaire_public(request):
         return JsonResponse({"campagne": serializers.campagne(campagne), "ouverte": True, "etablissements": [
             {"id": e.pk, "nom": e.nom, "sigle": e.sigle, "tutelle": e.tutelle}
             for e in EPN.objects.filter(actif=True).only("nom", "sigle", "tutelle")]})
-    if _trop_de_demandes(request):
+    if securite.trop_de_demandes_acces(request):
         raise Refus("Trop de demandes depuis cette connexion. Pour protéger les établissements, les envois sont "
                     "limités. Réessayez dans 10 minutes.", 429)
     id_epn = _corps(request).get("epn")
@@ -230,7 +208,10 @@ def moi(request):
 @api
 def connexion(request):
     corps = _corps(request)
-    user = authenticate(request, username=corps.get("identifiant", ""), password=corps.get("mot_de_passe", ""))
+    identifiant = str(corps.get("identifiant", ""))
+    if securite.connexion_bloquee(identifiant, request):
+        raise Refus("Trop de tentatives de connexion. Pour protéger le compte, réessayez dans 15 minutes.", 429)
+    user = authenticate(request, username=identifiant, password=str(corps.get("mot_de_passe", "")))
     if user is None or not user.is_staff:
         raise Refus("Identifiant ou mot de passe incorrect.", 401)
     login(request, user)

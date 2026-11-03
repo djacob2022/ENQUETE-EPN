@@ -29,6 +29,22 @@ COLONNES_FIXES = [
 ]
 
 
+DEBUTS_DE_FORMULE = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _ajouter(ws, valeurs):
+    """Ajoute une ligne de données : un texte qui ressemble à une formule reste du texte.
+
+    Sans cela, une réponse saisie comme « =HYPERLINK(…) » ou « =cmd|… » serait exécutée par Excel
+    à l'ouverture du fichier par l'administration (injection de formules).
+    """
+    ws.append(valeurs)
+    for cellule in ws[ws.max_row]:
+        if isinstance(cellule.value, str) and cellule.value.startswith(DEBUTS_DE_FORMULE):
+            cellule.data_type = "s"
+            cellule.quotePrefix = True
+
+
 def _entete(ws, valeurs):
     ws.append(valeurs)
     for cellule in ws[1]:
@@ -60,7 +76,7 @@ def classeur(campagne, reponses):
     questions = [q for _, q in toutes_les_questions()]
     _entete(ws, [nom for nom, _ in COLONNES_FIXES] + [q["code"] for q in questions])
     for r in reponses:
-        ws.append([f(r) for _, f in COLONNES_FIXES] + [_valeur_excel(q, r.donnees.get(q["code"])) for q in questions])
+        _ajouter(ws, [f(r) for _, f in COLONNES_FIXES] + [_valeur_excel(q, r.donnees.get(q["code"])) for q in questions])
     for ligne in ws.iter_rows(min_row=2, min_col=len(COLONNES_FIXES), max_col=len(COLONNES_FIXES)):
         for c in ligne:
             c.number_format = "dd/mm/yyyy hh:mm"
@@ -75,7 +91,7 @@ def classeur(campagne, reponses):
     _entete(wd, ["Code", "Module", "Libellé", "Type", "Obligatoire", "Modalités"])
     for module, q in toutes_les_questions():
         modalites = "; ".join(f"{c} = {lib}" for c, lib in q.get("choix", [])) or ("oui; non" if q["type"] == "oui_non" else "")
-        wd.append([q["code"], f"{module['code']}. {module['titre']}", q["libelle"], q["type"],
+        _ajouter(wd, [q["code"], f"{module['code']}. {module['titre']}", q["libelle"], q["type"],
                    "oui" if q.get("obligatoire", True) else "non", modalites])
     _largeurs(wd, 70)
 
@@ -87,7 +103,7 @@ def classeur(campagne, reponses):
             if item["genre"] != "numerique":
                 continue
             s = item["stats"]
-            wsx.append([item["q"]["code"], item["q"]["libelle"], s["n"], s.get("somme"), s.get("moyenne"),
+            _ajouter(wsx, [item["q"]["code"], item["q"]["libelle"], s["n"], s.get("somme"), s.get("moyenne"),
                         s.get("mediane"), s.get("min"), s.get("max"), s.get("ecart_type")])
     for ligne in wsx.iter_rows(min_row=2, min_col=4, max_col=9):
         for c in ligne:
@@ -98,7 +114,7 @@ def classeur(campagne, reponses):
     wi = wb.create_sheet("Indicateurs")
     _entete(wi, ["Indicateur", "Valeur (%)", "Mode de calcul"])
     for ind in statistiques.indicateurs(reponses):
-        wi.append([ind["libelle"], round(ind["valeur"], 1) if ind["valeur"] is not None else None, ind["formule"]])
+        _ajouter(wi, [ind["libelle"], round(ind["valeur"], 1) if ind["valeur"] is not None else None, ind["formule"]])
     _largeurs(wi, 60)
     if reponses:
         graphique = BarChart()
@@ -126,7 +142,7 @@ def classeur_liens(campagne, reponses):
     ws.title = "Liens"
     _entete(ws, ["EPN", "Sigle", "Tutelle", "E-mail du point focal", "Lien personnel", "Statut"])
     for r in reponses:
-        ws.append([r.epn.nom, r.epn.sigle, r.epn.tutelle, r.epn.email_contact, r.lien, r.get_statut_display()])
+        _ajouter(ws, [r.epn.nom, r.epn.sigle, r.epn.tutelle, r.epn.email_contact, r.lien, r.get_statut_display()])
         cellule = ws.cell(row=ws.max_row, column=5)
         cellule.hyperlink = r.lien
         cellule.style = "Hyperlink"

@@ -78,11 +78,11 @@ La rubrique J permet de déposer des fichiers : états financiers et rapport d'a
 
 ```bash
 cp .env.example .env        # puis changer les mots de passe
-docker compose up -d --build
+docker compose --profile dev up -d --build
 ```
 
 - Application : http://localhost:8000 (espace administrateur : http://localhost:8000/connexion/)
-- E-mails de test (Mailpit) : http://localhost:8025. Toutes les invitations et relances y arrivent sans être réellement envoyées.
+- E-mails de test (Mailpit) : http://localhost:8025. Toutes les invitations et relances y arrivent sans être réellement envoyées. Mailpit ne démarre qu'avec `--profile dev` et n'est accessible que depuis le poste lui-même : il conserve tous les liens personnels.
 - Le compte administrateur est créé au premier démarrage à partir de `DJANGO_SUPERUSER_USERNAME` / `DJANGO_SUPERUSER_PASSWORD`.
 - Avec `CHARGER_DONNEES_DEMO=1`, des EPN et des réponses fictives sont chargés. **Mettre 0 en production.**
 
@@ -92,7 +92,16 @@ Services : `web` (Django + Gunicorn), `db` (PostgreSQL 16), `mailpit` (e-mails d
 
 - `DJANGO_DEBUG=0`, une `DJANGO_SECRET_KEY` longue et aléatoire, `DJANGO_ALLOWED_HOSTS` et `SITE_URL` = le domaine réel.
 - Placer un proxy HTTPS (Nginx, Traefik…) devant le port 8000, puis `COOKIES_SECURE=1` et `NB_PROXYS_DE_CONFIANCE=1`. Ce dernier réglage permet à la limite anti-abus du lien unique de reconnaître chaque visiteur, et non le seul proxy.
-- Renseigner le serveur SMTP réel (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, identifiants) et retirer le service `mailpit`.
+- Renseigner le serveur SMTP réel (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, identifiants) et démarrer **sans** `--profile dev` (Mailpit reste arrêté) : `docker compose up -d --build`.
+- Mettre `CHARGER_DONNEES_DEMO=0`.
+- Limiter aussi la taille des envois dans le proxy (Nginx : `client_max_body_size 12m;`). L'application refuse déjà au-delà de 12 Mo.
+
+### Sécurité intégrée
+
+- Export Excel : aucune réponse saisie ne peut s'exécuter comme une formule.
+- Connexion : après 5 mots de passe erronés, le compte est bloqué 15 minutes (20 échecs pour une même adresse IP), sur l'API comme sur `/django-admin/`.
+- Journaux : les liens personnels n'y apparaissent jamais en clair (`/r/***`).
+- Envois : toute requête de plus de 12 Mo est refusée avant d'être lue.
 
 ## Développement sans Docker
 
