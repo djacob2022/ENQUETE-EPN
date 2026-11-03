@@ -1,0 +1,76 @@
+# ENQUÊTE-EPN – déploiement Docker.
+#   cp .env.example .env   (puis modifier les mots de passe)
+#   docker compose up -d --build
+# Test sur un poste : docker compose --profile dev up -d --build   (ajoute Mailpit, les e-mails de test)
+# Application : http://localhost:8000   ·   E-mails de test (Mailpit) : http://localhost:8025
+# Nom fixe : les volumes s'appellent enquete-epn_pgdata, enquete-epn_media, enquete-epn_backups.
+name: enquete-epn
+
+services:
+  web:
+    build: .
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    ports:
+      # Accessible depuis ce poste/serveur seulement. En production, Caddy (deploiement/) expose le site en HTTPS.
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
+    volumes:
+      - media:/app/media   # pièces jointes déposées par les EPN
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-enquete}
+      POSTGRES_USER: ${POSTGRES_USER:-enquete}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Définissez POSTGRES_PASSWORD dans .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-enquete} -d ${POSTGRES_DB:-enquete}"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Serveur e-mail de test : capture tous les e-mails (invitations, relances) sans les envoyer.
+  # En production, supprimez ce service et renseignez le SMTP réel dans .env.
+  # Il conserve tous les e-mails, liens personnels compris : accessible depuis ce poste seulement, et
+  # démarré uniquement avec le profil « dev » (docker compose --profile dev up), jamais en production.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    profiles: ["dev"]
+    ports:
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+
+  # Sauvegarde quotidienne de la base et des pièces jointes, conservée 30 jours dans le volume « backups ».
+  backup:
+    image: postgres:16-alpine
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-enquete}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-enquete}
+    volumes:
+      - backups:/backups
+      - media:/media:ro
+    entrypoint: >
+      sh -c 'while true; do
+        jour=$$(date +%Y-%m-%d_%H%M);
+        pg_dump -Fc > /backups/enquete_$$jour.dump &&
+        tar -czf /backups/pieces_$$jour.tar.gz -C /media . &&
+        find /backups \( -name "*.dump" -o -name "*.tar.gz" \) -mtime +30 -delete;
+        sleep 86400; done'
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media:
+  backups:

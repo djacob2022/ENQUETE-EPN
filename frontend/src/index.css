@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Thème : couleurs en triplets RGB pour permettre les opacités Tailwind (bg-marque/10…). */
+:root {
+  --fond: 247 248 246;
+  --surface: 255 255 255;
+  --relief: 241 243 240;
+  --encre: 17 24 39;
+  --discret: 75 85 99;
+  --trait: 222 226 221;
+  --marque: 0 122 77;
+  --marque-fonce: 0 92 58;
+  --marque-doux: 228 243 235;
+  --accent: 240 120 0;
+  --accent-fonce: 168 76 0;
+  --accent-doux: 255 241 224;
+  --succes: 21 128 61;
+  --succes-doux: 222 245 230;
+  --alerte: 161 98 7;
+  --alerte-doux: 254 243 220;
+  --danger: 185 28 28;
+  --danger-doux: 254 234 234;
+  --institution: 7 54 37;
+  color-scheme: light;
+}
+.dark {
+  --fond: 9 14 12;
+  --surface: 16 23 20;
+  --relief: 24 33 29;
+  --encre: 236 240 237;
+  --discret: 156 168 160;
+  --trait: 38 50 44;
+  --marque: 52 199 128;
+  --marque-fonce: 116 224 168;
+  --marque-doux: 15 46 32;
+  --accent: 255 158 64;
+  --accent-fonce: 255 181 110;
+  --accent-doux: 58 36 12;
+  --succes: 74 222 128;
+  --succes-doux: 14 44 26;
+  --alerte: 250 190 70;
+  --alerte-doux: 54 40 10;
+  --danger: 248 113 113;
+  --danger-doux: 60 20 20;
+  --institution: 6 40 28;
+  color-scheme: dark;
+}
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { @apply bg-fond text-encre font-sans text-[15px] leading-relaxed; font-feature-settings: "ss01", "cv11"; }
+  ::selection { background: rgb(var(--marque) / 0.18); }
+  :focus-visible { outline: 2px solid rgb(var(--marque)); outline-offset: 2px; border-radius: 6px; }
+  input[type="number"]::-webkit-inner-spin-button { opacity: .4; }
+}
+
+@layer components {
+  .chiffres { font-variant-numeric: tabular-nums; }
+  .titre-display { @apply font-display font-bold tracking-[-0.02em]; }
+  /* Bandeau tricolore : couleurs nationales, réglables ici. */
+  .tricolore { background: linear-gradient(90deg, rgb(var(--accent)) 0 33.33%, #fff 33.33% 66.66%, rgb(var(--marque)) 66.66% 100%); }
+  .motif-officiel {
+    background-image: repeating-linear-gradient(135deg, rgb(255 255 255 / .035) 0 2px, transparent 2px 14px);
+  }
+  .grille-fond {
+    background-image:
+      linear-gradient(rgb(var(--trait) / .55) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--trait) / .55) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse at top, black 30%, transparent 75%);
+  }
+  .defilement-fin::-webkit-scrollbar { width: 10px; height: 10px; }
+  .defilement-fin::-webkit-scrollbar-thumb { background: rgb(var(--trait)); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+}
+
+@media print {
+  .pas-imprimer { display: none !important; }
+  body { background: white; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

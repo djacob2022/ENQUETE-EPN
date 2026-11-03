@@ -1,0 +1,24 @@
+# Proxy HTTPS devant l'application : certificat Let's Encrypt obtenu et renouvelé automatiquement.
+# DOMAINE et EMAIL_ADMIN viennent du fichier .env.
+{
+	email {$EMAIL_ADMIN}
+}
+
+{$DOMAINE} {
+	encode zstd gzip
+
+	# Même limite que l'application : une pièce jointe de 10 Mo plus l'enveloppe de la requête.
+	request_body {
+		max_size 12MB
+	}
+
+	reverse_proxy web:8000 {
+		# Adresse réelle du visiteur transmise à Django (NB_PROXYS_DE_CONFIANCE=1).
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	# Journal d'accès désactivé ici : celui de Gunicorn masque déjà les jetons des liens personnels.
+	log {
+		output discard
+	}
+}
