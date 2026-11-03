@@ -91,7 +91,7 @@ Services : `web` (Django + Gunicorn), `db` (PostgreSQL 16), `mailpit` (e-mails d
 ### Mise en production
 
 - `DJANGO_DEBUG=0`, une `DJANGO_SECRET_KEY` longue et aléatoire, `DJANGO_ALLOWED_HOSTS` et `SITE_URL` = le domaine réel.
-- Placer un proxy HTTPS (Nginx, Traefik…) devant le port 8000, puis `COOKIES_SECURE=1`.
+- Placer un proxy HTTPS (Nginx, Traefik…) devant le port 8000, puis `COOKIES_SECURE=1` et `NB_PROXYS_DE_CONFIANCE=1`. Ce dernier réglage permet à la limite anti-abus du lien unique de reconnaître chaque visiteur, et non le seul proxy.
 - Renseigner le serveur SMTP réel (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, identifiants) et retirer le service `mailpit`.
 
 ## Développement sans Docker

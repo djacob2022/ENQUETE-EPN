@@ -302,11 +302,6 @@ class GestionTests(Base):
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", SITE_URL="http://testserver")
 class LienPublicTests(Base):
-    def setUp(self):
-        super().setUp()
-        from django.core.cache import cache
-        cache.clear()
-
     def test_liste_puis_envoi_du_lien_au_point_focal_officiel(self):
         d = self.client.get(reverse("api:formulaire_public")).json()
         self.assertTrue(d["ouverte"])
@@ -314,14 +309,41 @@ class LienPublicTests(Base):
         self.assertNotIn("email_contact", d["etablissements"][0])  # l'adresse n'est pas exposée
         resp = self.post("api:formulaire_public", donnees={"epn": self.epn.pk})
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["email_masque"], "f••••@epn.test")
+        self.assertEqual(resp.json()["email_masque"], "f•••@epn.test")  # longueur de l'adresse non révélée
+        self.assertFalse(resp.json()["deja_envoye"])
         self.assertNotIn("/r/", json.dumps(resp.json()))  # le lien personnel n'est jamais renvoyé au navigateur
         r = Reponse.objects.get(epn=self.epn)
         self.assertEqual(mail.outbox[0].to, ["focal@epn.test"])
         self.assertIn(r.lien, mail.outbox[0].body)
-        # Une deuxième demande dans les 5 minutes ne renvoie pas d'e-mail et ne crée pas de second lien.
-        self.post("api:formulaire_public", donnees={"epn": self.epn.pk})
+        self.assertIsNotNone(r.date_invitation)  # compte comme une invitation : pas de second envoi depuis l'admin
+        # Une deuxième demande dans les 5 minutes ne renvoie pas d'e-mail, ne crée pas de second lien, et le dit.
+        resp = self.post("api:formulaire_public", donnees={"epn": self.epn.pk})
+        self.assertTrue(resp.json()["deja_envoye"])
         self.assertEqual((len(mail.outbox), Reponse.objects.count()), (1, 1))
+
+    def test_e_mail_d_acces_uniquement_a_l_adresse_officielle(self):
+        r = Reponse.objects.create(campagne=self.campagne, epn=self.epn, email="perso@ailleurs.test", nom="X")
+        self.post("api:formulaire_public", donnees={"epn": self.epn.pk})
+        self.assertEqual(mail.outbox[0].to, ["focal@epn.test"])
+        self.assertIn(r.lien, mail.outbox[0].body)
+
+    def test_corps_malformes_refuses_proprement(self):
+        for corps in ('{"epn": "abc"}', "[1]", '"texte"', '{"epn": null}', '{"epn": -3}'):
+            resp = self.client.post(reverse("api:formulaire_public"), corps, content_type="application/json")
+            self.assertEqual(resp.status_code, 400, corps)
+
+    @override_settings(NB_PROXYS_DE_CONFIANCE=1)
+    def test_limite_par_visiteur_reel_derriere_un_proxy(self):
+        for i in range(10):  # 10 visiteurs différents derrière le même proxy
+            self.client.post(reverse("api:formulaire_public"), json.dumps({"epn": 999}), content_type="application/json",
+                             REMOTE_ADDR="10.0.0.2", HTTP_X_FORWARDED_FOR=f"41.0.0.{i}")
+        resp = self.client.post(reverse("api:formulaire_public"), json.dumps({"epn": self.epn.pk}), content_type="application/json",
+                                REMOTE_ADDR="10.0.0.2", HTTP_X_FORWARDED_FOR="41.9.9.9")
+        self.assertEqual(resp.status_code, 200)
+        for _ in range(10):  # le même visiteur, lui, est bien limité
+            resp = self.client.post(reverse("api:formulaire_public"), json.dumps({"epn": 999}), content_type="application/json",
+                                    REMOTE_ADDR="10.0.0.2", HTTP_X_FORWARDED_FOR="41.9.9.9")
+        self.assertEqual(resp.status_code, 429)
 
     def test_etablissement_inconnu_ou_inactif(self):
         inactif = EPN.objects.create(nom="Fermé", tutelle="T", email_contact="x@epn.test", actif=False)

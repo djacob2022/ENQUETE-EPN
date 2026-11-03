@@ -5,6 +5,7 @@ import {
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, avecParams, ErreurApi } from "@/lib/api";
+import { copier } from "@/lib/presse-papiers";
 import { date, ilYa, taille } from "@/lib/format";
 import { ReponseDetail, ReponseResume, Statut } from "@/lib/types";
 import { BadgeStatut, Bouton, Carte, cx, Liste, Progression, Squelette, Tiroir, useToast, Vide } from "@/ui";
@@ -140,7 +141,11 @@ function DetailReponse({ id }: { id: number }) {
   const r = q.data;
   if (!r) return <div className="space-y-4 p-6"><Squelette className="h-10 w-2/3" /><Squelette className="h-24" /><Squelette className="h-72" /></div>;
 
-  const copier = async () => { await navigator.clipboard.writeText(r.lien); setCopie(true); setTimeout(() => setCopie(false), 1500); };
+  const copierLien = async () => {
+    if (!(await copier(r.lien))) return toast("erreur", "Copie impossible dans ce navigateur : utilisez « Ouvrir le formulaire » puis copiez l'adresse.");
+    setCopie(true);
+    setTimeout(() => setCopie(false), 1500);
+  };
 
   return (
     <div>
@@ -155,7 +160,7 @@ function DetailReponse({ id }: { id: number }) {
                 <Bouton taille="sm" variante="primaire" icone={<BellRing className="h-3.5 w-3.5" />} chargement={action.isPending && action.variables === "relancer"} onClick={() => action.mutate("relancer")}>Relancer</Bouton>
                 <Bouton taille="sm" icone={<Send className="h-3.5 w-3.5" />} chargement={action.isPending && action.variables === "inviter"} onClick={() => action.mutate("inviter")}>{r.date_invitation ? "Renvoyer l'invitation" : "Envoyer l'invitation"}</Bouton>
               </>}
-          <Bouton taille="sm" icone={copie ? <Check className="h-3.5 w-3.5 text-succes" /> : <Copy className="h-3.5 w-3.5" />} onClick={copier}>{copie ? "Lien copié" : "Copier le lien"}</Bouton>
+          <Bouton taille="sm" icone={copie ? <Check className="h-3.5 w-3.5 text-succes" /> : <Copy className="h-3.5 w-3.5" />} onClick={copierLien}>{copie ? "Lien copié" : "Copier le lien"}</Bouton>
           <a href={r.lien} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-2 rounded-[10px] px-3 text-[13px] font-medium text-discret hover:bg-relief hover:text-encre"><ExternalLink className="h-3.5 w-3.5" /> Ouvrir le formulaire</a>
         </div>
       </div>

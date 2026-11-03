@@ -4,6 +4,13 @@ from django.db import models
 from django.utils import timezone
 
 
+def lien_public():
+    """Le lien unique, identique pour tous les EPN (seul endroit où il est construit)."""
+    from django.conf import settings
+
+    return settings.SITE_URL + "/formulaire"
+
+
 def nouveau_jeton():
     return secrets.token_urlsafe(24)
 
@@ -127,6 +134,13 @@ class Reponse(models.Model):
         from .questionnaire import MODULES
 
         return round(100 * len(self.modules_completes) / len(MODULES))
+
+
+class DemandeAcces(models.Model):
+    """Une demande de lien sur le formulaire public, pour la limite anti-abus par adresse IP."""
+
+    ip = models.GenericIPAddressField(db_index=True)
+    date = models.DateTimeField(auto_now_add=True, db_index=True)
 
 
 class Envoi(models.Model):

@@ -30,6 +30,9 @@ CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 # Adresse publique utilisée pour construire les liens envoyés par e-mail.
 SITE_URL = os.environ.get("SITE_URL", "http://localhost:8000").rstrip("/")
+# Nombre de proxys de confiance devant l'application (Nginx, Traefik…) : 0 = accès direct.
+# Sert à retrouver l'adresse IP réelle du visiteur dans X-Forwarded-For pour la limite anti-abus.
+NB_PROXYS_DE_CONFIANCE = int(os.environ.get("NB_PROXYS_DE_CONFIANCE", "0"))
 NOM_INSTITUTION = os.environ.get("NOM_INSTITUTION", "[Nom de l'institution de tutelle]")
 # Identité officielle affichée dans l'en-tête de toutes les pages (à adapter dans .env).
 PAYS = os.environ.get("PAYS", "République de [Pays]")

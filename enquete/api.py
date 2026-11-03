@@ -6,7 +6,6 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
-from django.core.cache import cache
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
@@ -17,7 +16,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from . import export_excel, serializers, services, statistiques
 from .emails import envoyer_acces, envoyer_invitation, envoyer_relance
 from .forms import CampagneForm, IdentificationForm, ImportEPNForm
-from .models import EPN, Campagne, Envoi, PieceJointe, Reponse
+from .models import EPN, Campagne, DemandeAcces, Envoi, PieceJointe, Reponse, lien_public
 from .services import Refus
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -25,9 +24,12 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 def _corps(request):
     try:
-        return json.loads(request.body or b"{}")
+        corps = json.loads(request.body or b"{}")
     except json.JSONDecodeError:
         raise Refus("Requête invalide.")
+    if not isinstance(corps, dict):
+        raise Refus("Requête invalide.")
+    return corps
 
 
 def api(vue):
@@ -78,22 +80,35 @@ def csrf(request):
 def config(request):
     """Identité officielle affichée dans l'en-tête (réglée dans .env)."""
     return JsonResponse({"pays": settings.PAYS, "devise": settings.DEVISE, "ministere": settings.NOM_MINISTERE,
-                         "institution": settings.NOM_INSTITUTION, "lien_public": settings.SITE_URL + "/formulaire"})
+                         "institution": settings.NOM_INSTITUTION, "lien_public": lien_public()})
 
 
 def _masquer(email):
+    """Première lettre et domaine seulement : la longueur de l'adresse n'est pas révélée."""
     nom, _, domaine = email.partition("@")
-    return f"{nom[:1]}{'•' * max(len(nom) - 1, 3)}@{domaine}"
+    return f"{nom[:1]}•••@{domaine}"
 
 
-def _trop_de_demandes(request, limite=10, fenetre=600):
-    """Limite simple par adresse IP : au plus `limite` demandes de lien par fenêtre de `fenetre` secondes."""
-    cle = f"acces:{request.META.get('REMOTE_ADDR', '')}"
-    n = cache.get(cle, 0)
-    if n >= limite:
-        return True
-    cache.set(cle, n + 1, fenetre)
-    return False
+def _ip_client(request):
+    """Adresse du visiteur ; derrière N proxys de confiance, la N-ième en partant de la fin de X-Forwarded-For."""
+    n = settings.NB_PROXYS_DE_CONFIANCE
+    chaine = [x.strip() for x in request.META.get("HTTP_X_FORWARDED_FOR", "").split(",") if x.strip()]
+    if n and len(chaine) >= n:
+        return chaine[-n]
+    return request.META.get("REMOTE_ADDR", "0.0.0.0")
+
+
+def _trop_de_demandes(request, limite=10, fenetre=timedelta(minutes=10)):
+    """Au plus `limite` demandes de lien par adresse IP sur la fenêtre glissante.
+
+    Chaque demande est une ligne en base : le compte est partagé entre les processus du serveur, survit aux
+    redémarrages, et deux demandes simultanées ne peuvent pas « perdre » une incrémentation.
+    """
+    debut = timezone.now() - fenetre
+    DemandeAcces.objects.filter(date__lt=debut).delete()
+    ip = _ip_client(request)
+    DemandeAcces.objects.create(ip=ip)
+    return DemandeAcces.objects.filter(ip=ip, date__gte=debut).count() > limite
 
 
 @require_http_methods(["GET", "POST"])
@@ -107,24 +122,28 @@ def formulaire_public(request):
     if campagne is None or not campagne.est_ouverte:
         if request.method == "GET":
             return JsonResponse({"campagne": serializers.campagne(campagne), "ouverte": False, "etablissements": []})
-        raise Refus("Aucune campagne n'est ouverte en ce moment.", 403)
+        raise Refus("Le questionnaire n'est pas ouvert en ce moment.", 403)
     if request.method == "GET":
         return JsonResponse({"campagne": serializers.campagne(campagne), "ouverte": True, "etablissements": [
             {"id": e.pk, "nom": e.nom, "sigle": e.sigle, "tutelle": e.tutelle}
             for e in EPN.objects.filter(actif=True).only("nom", "sigle", "tutelle")]})
     if _trop_de_demandes(request):
-        raise Refus("Trop de demandes. Réessayez dans quelques minutes.", 429)
-    epn = EPN.objects.filter(actif=True, pk=_corps(request).get("epn")).first()
+        raise Refus("Trop de demandes depuis cette connexion. Pour protéger les établissements, les envois sont "
+                    "limités. Réessayez dans 10 minutes.", 429)
+    id_epn = _corps(request).get("epn")
+    if not str(id_epn).isdigit():
+        raise Refus("Choisissez votre établissement dans la liste.")
+    epn = EPN.objects.filter(actif=True, pk=int(id_epn)).first()
     if epn is None:
         raise Refus("Choisissez votre établissement dans la liste.")
     reponse, _ = Reponse.objects.select_related("epn", "campagne").get_or_create(campagne=campagne, epn=epn)
-    reponse = Reponse.objects.select_related("epn", "campagne").get(pk=reponse.pk)
     deja = reponse.envois.filter(type=Envoi.Type.ACCES, succes=True,
                                  date__gte=timezone.now() - timedelta(minutes=5)).exists()
     if not deja and not envoyer_acces(reponse):
-        raise Refus("L'e-mail n'a pas pu être envoyé. Réessayez plus tard ou contactez l'administration.", 502)
+        raise Refus("Le lien n'a pas pu être envoyé : le service d'e-mail est momentanément indisponible. "
+                    "Réessayez dans quelques minutes.", 502)
     return JsonResponse({"email_masque": _masquer(epn.email_contact), "deja_soumis": reponse.est_soumise,
-                         "epn": epn.nom})
+                         "deja_envoye": deja, "epn": epn.nom})
 
 
 @require_GET
@@ -348,7 +367,7 @@ def liens(request):
             return JsonResponse({"crees": crees, "envoyees": envoyees})
     qs = c.reponses.select_related("epn", "campagne").order_by("epn__nom")
     return JsonResponse({
-        "campagne": serializers.campagne(c), "crees": crees, "lien_public": settings.SITE_URL + "/formulaire",
+        "campagne": serializers.campagne(c), "crees": crees, "lien_public": lien_public(),
         "sans_lien": EPN.objects.filter(actif=True).exclude(reponses__campagne=c).count(),
         "liens": [serializers.reponse_resume(r) for r in qs],
     })

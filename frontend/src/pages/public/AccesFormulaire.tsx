@@ -11,7 +11,7 @@ import { Bouton, Carte, cx, Squelette } from "@/ui";
 
 interface Etablissement { id: number; nom: string; sigle: string; tutelle: string }
 interface Donnees { campagne: Campagne | null; ouverte: boolean; etablissements: Etablissement[] }
-interface Resultat { email_masque: string; deja_soumis: boolean; epn: string }
+interface Resultat { email_masque: string; deja_soumis: boolean; deja_envoye: boolean; epn: string }
 
 const normaliser = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -60,10 +60,20 @@ export default function AccesFormulaire() {
               {demande.data ? (
                 <motion.div key="ok" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="p-8 sm:p-10">
                   <span className="grid h-14 w-14 place-items-center rounded-full bg-succes-doux text-succes"><MailCheck className="h-7 w-7" /></span>
-                  <h2 className="mt-5 text-2xl font-bold tracking-tight">Lien envoyé à votre point focal</h2>
-                  <p className="mt-2 max-w-xl text-discret">
-                    Le lien personnel de <strong className="text-encre">{demande.data.epn}</strong> vient d'être envoyé à l'adresse officielle
-                    enregistrée pour votre établissement : <strong className="font-mono text-encre">{demande.data.email_masque}</strong>.
+                  <h2 className="mt-5 text-2xl font-bold tracking-tight">{demande.data.deja_envoye ? "Lien déjà envoyé" : "Lien envoyé au point focal"}</h2>
+                  {demande.data.deja_envoye ? (
+                    <p className="mt-2 max-w-xl text-discret">
+                      Un lien a déjà été envoyé à <strong className="font-mono text-encre">{demande.data.email_masque}</strong> il y a quelques minutes.
+                      Vérifiez la boîte de réception et les courriers indésirables avant de faire une nouvelle demande.
+                    </p>
+                  ) : (
+                    <p className="mt-2 max-w-xl text-discret">
+                      Le lien du questionnaire de <strong className="text-encre">{demande.data.epn}</strong> a été envoyé
+                      à <strong className="font-mono text-encre">{demande.data.email_masque}</strong>, l'adresse officielle enregistrée pour votre établissement.
+                    </p>
+                  )}
+                  <p className="mt-4 max-w-xl rounded-lg border border-trait bg-relief/60 px-4 py-3 text-sm">
+                    <strong>Vous n'êtes pas le point focal ?</strong> Demandez-lui de vous transférer l'e-mail « Votre lien d'accès au questionnaire ».
                   </p>
                   {demande.data.deja_soumis && (
                     <p className="mt-4 rounded-lg border border-succes/30 bg-succes-doux px-4 py-3 text-sm text-succes">
@@ -76,15 +86,15 @@ export default function AccesFormulaire() {
                       <li key={t} className="flex gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-marque text-xs font-bold text-white dark:text-[#04140c]">{i + 1}</span>{t}</li>
                     ))}
                   </ol>
-                  <p className="mt-6 text-sm text-discret">Rien reçu après quelques minutes ? Vérifiez les courriers indésirables, ou contactez l'administration de tutelle si l'adresse n'est plus à jour.</p>
+                  <p className="mt-6 text-sm text-discret">Rien reçu après 10 minutes ? Vérifiez les courriers indésirables. Si l'adresse du point focal n'est plus à jour, contactez l'administration de tutelle.</p>
                   <Bouton variante="fantome" className="mt-4" onClick={() => { demande.reset(); setChoisi(null); }}>Choisir un autre établissement</Bouton>
                 </motion.div>
               ) : (
                 <motion.div key="choix" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <div className="border-b border-trait px-6 pb-5 pt-6 sm:px-8">
-                    <p className="text-xs font-bold uppercase tracking-[.12em] text-marque">Étape 1 sur 2</p>
+                    <p className="text-xs font-bold uppercase tracking-[.12em] text-marque">Accès au questionnaire</p>
                     <h2 className="mt-1 text-2xl font-bold tracking-tight">Sélectionnez votre établissement</h2>
-                    <p className="mt-1 text-sm text-discret">Le lien personnel de votre établissement sera envoyé à l'adresse e-mail officielle de son point focal.</p>
+                    <p className="mt-1 text-sm text-discret">Nous enverrons le lien du questionnaire à l'adresse e-mail officielle du point focal de votre établissement.</p>
                     <label className="relative mt-5 block">
                       <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-discret" />
                       <input value={recherche} onChange={(e) => setRecherche(e.target.value)} autoFocus disabled={!q.data?.ouverte}
@@ -96,7 +106,7 @@ export default function AccesFormulaire() {
                   {q.isLoading ? <div className="space-y-2 p-6">{[0, 1, 2, 3].map((i) => <Squelette key={i} className="h-14" />)}</div>
                     : !q.data?.ouverte ? (
                       <div className="flex items-start gap-3 p-8 text-discret"><Lock className="mt-0.5 h-5 w-5" />
-                        <p>Aucune campagne n'est ouverte en ce moment{campagne ? ` (période : du ${date(campagne.date_ouverture)} au ${date(campagne.date_cloture)})` : ""}.</p></div>
+                        <p>Le questionnaire n'est pas ouvert en ce moment.{campagne ? ` La campagne se déroule du ${date(campagne.date_ouverture)} au ${date(campagne.date_cloture)}.` : ""}</p></div>
                     ) : (
                       <ul role="listbox" aria-label="Établissements" className="defilement-fin max-h-[420px] divide-y divide-trait overflow-y-auto">
                         {resultats.map((e) => {
@@ -122,9 +132,9 @@ export default function AccesFormulaire() {
 
                   {q.data?.ouverte && (
                     <div className="flex flex-col gap-3 border-t border-trait bg-relief/40 px-6 py-4 sm:flex-row sm:items-center sm:px-8">
-                      <p className="flex-1 text-sm text-discret">{choisi ? <>Établissement choisi : <strong className="text-encre">{choisi.nom}</strong></> : "Aucun établissement choisi."}</p>
+                      <p className="flex-1 text-sm text-discret">{choisi ? <>Établissement choisi : <strong className="text-encre">{choisi.nom}</strong></> : "Choisissez votre établissement dans la liste ci-dessus."}</p>
                       <Bouton variante="primaire" taille="lg" disabled={!choisi} chargement={demande.isPending} onClick={() => choisi && demande.mutate(choisi.id)}>
-                        Recevoir mon lien d'accès <ArrowRight className="h-4 w-4" />
+                        Envoyer le lien au point focal <ArrowRight className="h-4 w-4" />
                       </Bouton>
                     </div>
                   )}
@@ -136,10 +146,9 @@ export default function AccesFormulaire() {
 
           <aside className="space-y-4">
             <Carte className="p-6">
-              <h2 className="flex items-center gap-2 font-bold"><ShieldCheck className="h-5 w-5 text-marque" /> Un accès sécurisé</h2>
+              <h2 className="flex items-center gap-2 font-bold"><ShieldCheck className="h-5 w-5 text-marque" /> Pourquoi passer par le point focal ?</h2>
               <p className="mt-2 text-sm leading-relaxed text-discret">
-                Pour éviter qu'une personne réponde à la place d'un autre établissement, le questionnaire ne s'ouvre qu'avec le lien personnel
-                envoyé à l'adresse officielle de votre point focal.
+                Pour que personne ne puisse répondre au nom d'un autre établissement. Seul le lien envoyé à l'adresse officielle ouvre votre questionnaire.
               </p>
             </Carte>
             <Carte className="p-6">

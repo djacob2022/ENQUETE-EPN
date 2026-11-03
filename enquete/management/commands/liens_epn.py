@@ -1,7 +1,7 @@
 """Affiche (et au besoin génère) le lien personnel de chaque EPN pour la campagne active."""
 from django.core.management.base import BaseCommand, CommandError
 
-from enquete.models import Campagne
+from enquete.models import Campagne, lien_public
 
 
 class Command(BaseCommand):
@@ -16,9 +16,7 @@ class Command(BaseCommand):
             raise CommandError("Aucune campagne active : créez-en une dans l'espace administrateur.")
         if generer:
             self.stdout.write(f"{campagne.generer_liens()} lien(s) généré(s).")
-        from django.conf import settings
-
-        self.stdout.write(f"Lien unique à diffuser à tous les EPN :\n  {settings.SITE_URL}/formulaire\n")
+        self.stdout.write(f"Lien unique à diffuser à tous les EPN :\n  {lien_public()}\n")
         self.stdout.write("Liens personnels, par établissement :")
         reponses = campagne.reponses.select_related("epn").order_by("epn__nom")
         if not reponses:

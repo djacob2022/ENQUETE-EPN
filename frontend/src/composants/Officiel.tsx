@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useId } from "react";
 import { api } from "@/lib/api";
 import { cx } from "@/ui";
 
@@ -10,12 +11,13 @@ export function useConfig() {
 
 /** Emblème neutre (écu tricolore) : à remplacer par les armoiries officielles fournies par l'institution. */
 export function Embleme({ className }: { className?: string }) {
+  const ecu = `ecu-${useId().replace(/:/g, "")}`;
   return (
     <svg viewBox="0 0 40 46" className={cx("h-10 w-9 shrink-0", className)} role="img" aria-label="Emblème">
       <defs>
-        <clipPath id="ecu"><path d="M20 1.5 37.5 7v15.5C37.5 33.5 29.8 41 20 44.5 10.2 41 2.5 33.5 2.5 22.5V7Z" /></clipPath>
+        <clipPath id={ecu}><path d="M20 1.5 37.5 7v15.5C37.5 33.5 29.8 41 20 44.5 10.2 41 2.5 33.5 2.5 22.5V7Z" /></clipPath>
       </defs>
-      <g clipPath="url(#ecu)">
+      <g clipPath={`url(#${ecu})`}>
         <rect width="14" height="46" fill="rgb(var(--accent))" />
         <rect x="13.33" width="13.34" height="46" fill="#fff" />
         <rect x="26.66" width="14" height="46" fill="rgb(var(--marque))" />

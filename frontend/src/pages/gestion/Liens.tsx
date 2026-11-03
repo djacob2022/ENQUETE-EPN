@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, Download, ExternalLink, Link2, MailCheck, Search, Send, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api, avecParams, ErreurApi } from "@/lib/api";
+import { copier } from "@/lib/presse-papiers";
 import { date } from "@/lib/format";
 import { ReponseResume } from "@/lib/types";
 import { BadgeStatut, Bouton, Carte, cx, Dialogue, Squelette, useToast, Vide } from "@/ui";
@@ -44,10 +45,10 @@ export default function Liens() {
 
   if (!campagne) return <SansCampagne />;
 
-  async function copier(l: ReponseResume) {
-    await navigator.clipboard.writeText(l.lien);
-    setCopie(l.id);
-    setTimeout(() => setCopie((c) => (c === l.id ? null : c)), 1600);
+  async function copierLien(texte: string, cle: number) {
+    if (!(await copier(texte))) return toast("erreur", "Copie impossible dans ce navigateur : sélectionnez le lien et copiez-le à la main.");
+    setCopie(cle);
+    setTimeout(() => setCopie((c) => (c === cle ? null : c)), 1600);
   }
   const basculer = (id: number) => setSelection((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -74,7 +75,7 @@ export default function Liens() {
             </div>
             <div className="flex min-w-[300px] flex-1 items-center gap-2 rounded-lg bg-white/10 p-1.5 pl-4 ring-1 ring-white/15">
               <code className="min-w-0 flex-1 truncate font-mono text-sm">{q.data.lien_public}</code>
-              <button onClick={async () => { await navigator.clipboard.writeText(q.data.lien_public); setCopie(-1); setTimeout(() => setCopie(null), 1600); }}
+              <button onClick={() => copierLien(q.data.lien_public, -1)}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md bg-white px-3 text-sm font-semibold text-institution transition hover:bg-white/90">
                 {copie === -1 ? <><Check className="h-4 w-4" /> Copié</> : <><Copy className="h-4 w-4" /> Copier</>}
               </button>
@@ -116,7 +117,7 @@ export default function Liens() {
                   <td className="px-4 py-3">
                     <div className="flex max-w-[420px] items-center gap-1 rounded-[10px] border border-trait bg-relief/50 py-1 pl-3 pr-1">
                       <code className="min-w-0 flex-1 truncate font-mono text-xs text-discret" title={l.lien}>{l.lien.replace(/^https?:\/\//, "")}</code>
-                      <Bouton taille="sm" variante="fantome" className="h-7 px-2" onClick={() => copier(l)} aria-label={`Copier le lien de ${l.epn.nom}`}>
+                      <Bouton taille="sm" variante="fantome" className="h-7 px-2" onClick={() => copierLien(l.lien, l.id)} aria-label={`Copier le lien de ${l.epn.nom}`}>
                         {copie === l.id ? <><Check className="h-3.5 w-3.5 text-succes" /><span className="text-succes">Copié</span></> : <><Copy className="h-3.5 w-3.5" />Copier</>}
                       </Bouton>
                       <a href={l.lien} target="_blank" rel="noopener" className="grid h-7 w-7 place-items-center rounded-md text-discret hover:bg-surface hover:text-encre" aria-label="Ouvrir"><ExternalLink className="h-3.5 w-3.5" /></a>
