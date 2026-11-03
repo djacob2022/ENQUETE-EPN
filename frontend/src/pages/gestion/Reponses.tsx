@@ -202,7 +202,7 @@ function DetailReponse({ id }: { id: number }) {
 
         {onglet === "pieces" && (r.pieces.length === 0 ? <Vide icone={<FileText className="h-5 w-5" />} titre="Aucune pièce jointe" /> : (
           <>
-            {r.zip_url && <a href={r.zip_url} className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-marque px-4 text-sm font-medium text-white dark:text-[#06101f]"><FileArchive className="h-4 w-4" /> Tout télécharger (ZIP)</a>}
+            {r.zip_url && <a href={r.zip_url} className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-marque px-4 text-sm font-medium text-white dark:text-[#04140c]"><FileArchive className="h-4 w-4" /> Tout télécharger (ZIP)</a>}
             <Carte className="divide-y divide-trait">
               {r.pieces.map((p) => (
                 <a key={p.code} href={p.url} className="flex items-center gap-4 px-5 py-4 transition hover:bg-relief/50">

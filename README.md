@@ -14,6 +14,9 @@ L'interface appelle l'API sous `/api/` (même origine, session et jeton CSRF). E
 
 ## Fonctionnement
 
+**Le lien à diffuser à toutes les entités : `https://<votre-domaine>/formulaire`** (en local : http://localhost:8000/formulaire).
+C'est le même lien pour tous. L'entité y choisit son établissement ; son lien personnel est alors envoyé à l'adresse e-mail officielle de son point focal (enregistrée dans le répertoire). Personne ne peut donc répondre à la place d'un autre établissement.
+
 1. **L'administrateur** importe la liste des EPN (fichier Excel), crée une campagne, puis envoie les **invitations** : chaque EPN reçoit par e-mail un **lien personnel**.
 2. **La personne qui reçoit le lien** clique dessus, saisit ses **nom, prénom, e-mail et téléphone**, clique sur **Suivant**, puis répond aux questions rubrique par rubrique. Les réponses sont enregistrées à chaque étape : elle peut reprendre plus tard avec le même lien. Elle relit un récapitulatif, certifie, puis clique sur **Envoyer**. Un accusé de réception est envoyé par e-mail.
 3. **L'espace administrateur** (`/gestion/`) permet de :
@@ -50,6 +53,8 @@ Le questionnaire (9 rubriques, 48 questions, dont 5 pièces justificatives) est 
    - **Retour côté administrateur :** relances, export Excel, statistiques.
 
 4. Arrêter : `.\lancer.ps1 arreter` ou `./lancer.sh arreter` (les données sont conservées). Tout effacer : `effacer` au lieu de `arreter`.
+
+Personnaliser l'en-tête officiel : `PAYS`, `DEVISE`, `NOM_MINISTERE` et `NOM_INSTITUTION` dans `.env`. Les couleurs nationales se règlent dans `frontend/src/index.css` (`--marque`, `--accent`). L'emblème neutre (`frontend/src/composants/Officiel.tsx`) est à remplacer par les armoiries officielles.
 
 Afficher tous les liens dans le terminal (`--generer` crée d'abord ceux qui manquent) :
 

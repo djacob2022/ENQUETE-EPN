@@ -4,6 +4,7 @@ import { ArrowRight, BarChart3, FileSpreadsheet, MailCheck } from "lucide-react"
 import { FormEvent, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import BoutonTheme from "@/composants/BoutonTheme";
+import { Embleme, useConfig } from "@/composants/Officiel";
 import { api, ErreurApi } from "@/lib/api";
 import { Moi } from "@/lib/types";
 import { Bouton, Champ, Logo } from "@/ui";
@@ -16,6 +17,7 @@ export default function Connexion() {
   const [motDePasse, setMotDePasse] = useState("");
   const [erreur, setErreur] = useState<string>();
   const [envoi, setEnvoi] = useState(false);
+  const config = useConfig();
 
   async function connecter(e: FormEvent) {
     e.preventDefault();
@@ -34,13 +36,15 @@ export default function Connexion() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      <section className="relative hidden overflow-hidden bg-[#0b1b33] p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="pointer-events-none absolute -left-40 top-20 h-[480px] w-[480px] rounded-full bg-[#2563eb]/35 blur-[110px]" />
-        <div className="pointer-events-none absolute -bottom-40 right-0 h-[420px] w-[420px] rounded-full bg-[#10b981]/20 blur-[110px]" />
-        <div className="pointer-events-none absolute inset-0 opacity-[.07]" style={{ backgroundImage: "radial-gradient(white 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
-        <div className="relative"><Logo clair /></div>
+      <section className="motif-officiel relative hidden overflow-hidden bg-institution p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="tricolore absolute inset-x-0 top-0 h-1.5" aria-hidden />
+        <div className="relative flex items-center gap-3">
+          <Embleme className="h-12 w-10" />
+          <div className="leading-tight"><p className="text-sm font-extrabold uppercase tracking-[.08em]">{config?.pays}</p><p className="text-xs italic text-white/70">{config?.devise}</p></div>
+        </div>
         <div className="relative max-w-lg">
-          <h1 className="titre-display text-6xl leading-[1.02]">Pilotez l'enquête,<br /><span className="italic text-[#93c5fd]">sans tableur.</span></h1>
+          <p className="text-sm font-semibold uppercase tracking-[.12em] text-accent">{config?.ministere}</p>
+          <h1 className="titre-display mt-3 text-5xl leading-[1.08]">Espace de pilotage de l'enquête sur les EPN</h1>
           <p className="mt-6 text-lg text-white/70">Suivi en temps réel des réponses des établissements, relances, exports et statistiques.</p>
           <div className="mt-10 space-y-3">
             {[{ i: BarChart3, t: "Tableau de bord et statistiques en direct" }, { i: MailCheck, t: "Liens personnels et relances automatiques" },

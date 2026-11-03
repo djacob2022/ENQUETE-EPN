@@ -20,7 +20,7 @@ export default function Liens() {
 
   const q = useQuery({
     queryKey: ["liens", campagne?.id],
-    queryFn: () => api.get<{ liens: ReponseResume[]; sans_lien: number }>(url), enabled: !!campagne,
+    queryFn: () => api.get<{ liens: ReponseResume[]; sans_lien: number; lien_public: string }>(url), enabled: !!campagne,
   });
   const rafraichir = () => ["liens", "reponses", "tableau"].forEach((k) => client.invalidateQueries({ queryKey: [k] }));
   const generer = useMutation({
@@ -53,7 +53,7 @@ export default function Liens() {
 
   return (
     <>
-      <EnTetePage titre="Liens et invitations" sous="Chaque établissement dispose d'un lien unique et personnel vers son questionnaire."
+      <EnTetePage titre="Liens et invitations" sous="Un lien unique pour tous, et un lien personnel par établissement."
         actions={<>
           <a href={avecParams("/api/gestion/liens.xlsx", { campagne: campagne.id })} className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-trait bg-surface px-4 text-sm font-medium shadow-sm hover:bg-relief">
             <Download className="h-4 w-4" /> Exporter (Excel)</a>
@@ -62,6 +62,26 @@ export default function Liens() {
           <Bouton variante="primaire" icone={<Send className="h-4 w-4" />} disabled={!cibles.length} onClick={() => setConfirmer(true)}>
             Envoyer {selection.size ? "la sélection" : "les invitations"}{cibles.length ? ` (${cibles.length})` : ""}</Bouton>
         </>} />
+
+      {q.data && (
+        <section aria-label="Lien unique" className="motif-officiel relative mb-6 overflow-hidden rounded-2xl bg-institution p-6 text-white shadow-carte">
+          <div className="tricolore absolute inset-x-0 top-0 h-1" aria-hidden />
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="min-w-[260px] flex-1">
+              <p className="text-xs font-bold uppercase tracking-[.12em] text-accent">Lien unique à diffuser</p>
+              <p className="mt-1 text-lg font-bold">Le même lien pour tous les établissements</p>
+              <p className="mt-1 text-sm text-white/75">Chaque entité y choisit son établissement ; son lien personnel part alors à l'adresse officielle de son point focal.</p>
+            </div>
+            <div className="flex min-w-[300px] flex-1 items-center gap-2 rounded-lg bg-white/10 p-1.5 pl-4 ring-1 ring-white/15">
+              <code className="min-w-0 flex-1 truncate font-mono text-sm">{q.data.lien_public}</code>
+              <button onClick={async () => { await navigator.clipboard.writeText(q.data.lien_public); setCopie(-1); setTimeout(() => setCopie(null), 1600); }}
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-white px-3 text-sm font-semibold text-institution transition hover:bg-white/90">
+                {copie === -1 ? <><Check className="h-4 w-4" /> Copié</> : <><Copy className="h-4 w-4" /> Copier</>}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Kpi icone={Link2} libelle="Liens générés" valeur={String(liens.length)} note="un par établissement actif" />

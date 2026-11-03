@@ -2,17 +2,22 @@
 import functools
 import json
 
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
+from django.core.cache import cache
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import export_excel, serializers, services, statistiques
-from .emails import envoyer_invitation, envoyer_relance
+from .emails import envoyer_acces, envoyer_invitation, envoyer_relance
 from .forms import CampagneForm, IdentificationForm, ImportEPNForm
-from .models import EPN, Campagne, PieceJointe, Reponse
+from .models import EPN, Campagne, Envoi, PieceJointe, Reponse
 from .services import Refus
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -67,6 +72,59 @@ def telechargement(contenu, type_mime, nom):
 @ensure_csrf_cookie
 def csrf(request):
     return JsonResponse({"ok": True})
+
+
+@require_GET
+def config(request):
+    """Identité officielle affichée dans l'en-tête (réglée dans .env)."""
+    return JsonResponse({"pays": settings.PAYS, "devise": settings.DEVISE, "ministere": settings.NOM_MINISTERE,
+                         "institution": settings.NOM_INSTITUTION, "lien_public": settings.SITE_URL + "/formulaire"})
+
+
+def _masquer(email):
+    nom, _, domaine = email.partition("@")
+    return f"{nom[:1]}{'•' * max(len(nom) - 1, 3)}@{domaine}"
+
+
+def _trop_de_demandes(request, limite=10, fenetre=600):
+    """Limite simple par adresse IP : au plus `limite` demandes de lien par fenêtre de `fenetre` secondes."""
+    cle = f"acces:{request.META.get('REMOTE_ADDR', '')}"
+    n = cache.get(cle, 0)
+    if n >= limite:
+        return True
+    cache.set(cle, n + 1, fenetre)
+    return False
+
+
+@require_http_methods(["GET", "POST"])
+@api
+def formulaire_public(request):
+    """Lien unique pour tous : l'entité choisit son établissement, son lien personnel part au point focal officiel.
+
+    Le lien n'est jamais affiché ici : seul le détenteur de l'adresse e-mail officielle peut répondre.
+    """
+    campagne = Campagne.courante()
+    if campagne is None or not campagne.est_ouverte:
+        if request.method == "GET":
+            return JsonResponse({"campagne": serializers.campagne(campagne), "ouverte": False, "etablissements": []})
+        raise Refus("Aucune campagne n'est ouverte en ce moment.", 403)
+    if request.method == "GET":
+        return JsonResponse({"campagne": serializers.campagne(campagne), "ouverte": True, "etablissements": [
+            {"id": e.pk, "nom": e.nom, "sigle": e.sigle, "tutelle": e.tutelle}
+            for e in EPN.objects.filter(actif=True).only("nom", "sigle", "tutelle")]})
+    if _trop_de_demandes(request):
+        raise Refus("Trop de demandes. Réessayez dans quelques minutes.", 429)
+    epn = EPN.objects.filter(actif=True, pk=_corps(request).get("epn")).first()
+    if epn is None:
+        raise Refus("Choisissez votre établissement dans la liste.")
+    reponse, _ = Reponse.objects.select_related("epn", "campagne").get_or_create(campagne=campagne, epn=epn)
+    reponse = Reponse.objects.select_related("epn", "campagne").get(pk=reponse.pk)
+    deja = reponse.envois.filter(type=Envoi.Type.ACCES, succes=True,
+                                 date__gte=timezone.now() - timedelta(minutes=5)).exists()
+    if not deja and not envoyer_acces(reponse):
+        raise Refus("L'e-mail n'a pas pu être envoyé. Réessayez plus tard ou contactez l'administration.", 502)
+    return JsonResponse({"email_masque": _masquer(epn.email_contact), "deja_soumis": reponse.est_soumise,
+                         "epn": epn.nom})
 
 
 @require_GET
@@ -290,7 +348,7 @@ def liens(request):
             return JsonResponse({"crees": crees, "envoyees": envoyees})
     qs = c.reponses.select_related("epn", "campagne").order_by("epn__nom")
     return JsonResponse({
-        "campagne": serializers.campagne(c), "crees": crees,
+        "campagne": serializers.campagne(c), "crees": crees, "lien_public": settings.SITE_URL + "/formulaire",
         "sans_lien": EPN.objects.filter(actif=True).exclude(reponses__campagne=c).count(),
         "liens": [serializers.reponse_resume(r) for r in qs],
     })

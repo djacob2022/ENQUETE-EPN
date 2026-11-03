@@ -136,6 +136,7 @@ class Envoi(models.Model):
         INVITATION = "invitation", "Invitation"
         RELANCE = "relance", "Relance"
         ACCUSE = "accuse", "Accusé de réception"
+        ACCES = "acces", "Lien demandé via le formulaire public"
 
     reponse = models.ForeignKey(Reponse, on_delete=models.CASCADE, related_name="envois")
     type = models.CharField(max_length=12, choices=Type.choices)

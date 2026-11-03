@@ -69,8 +69,8 @@ export function ChampQuestion({ question: q, valeur, erreurs, changer }: {
                 <input type={multiple ? "checkbox" : "radio"} name={q.code} value={c.valeur} checked={actif}
                   onChange={() => basculer(c.valeur)} className="peer sr-only" />
                 <span className={cx("grid h-5 w-5 shrink-0 place-items-center border-2 transition peer-focus-visible:ring-2 peer-focus-visible:ring-marque/40",
-                  multiple ? "rounded-md" : "rounded-full", actif ? "border-marque bg-marque text-white dark:text-[#06101f]" : "border-trait bg-surface")}>
-                  {actif && (multiple ? <Check className="h-3 w-3" strokeWidth={3.5} /> : <span className="h-2 w-2 rounded-full bg-white dark:bg-[#06101f]" />)}
+                  multiple ? "rounded-md" : "rounded-full", actif ? "border-marque bg-marque text-white dark:text-[#04140c]" : "border-trait bg-surface")}>
+                  {actif && (multiple ? <Check className="h-3 w-3" strokeWidth={3.5} /> : <span className="h-2 w-2 rounded-full bg-white dark:bg-[#04140c]" />)}
                 </span>
                 <span className="leading-snug">{c.libelle}</span>
               </label>

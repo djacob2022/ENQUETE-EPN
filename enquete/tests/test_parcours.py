@@ -296,4 +296,49 @@ class GestionTests(Base):
         sortie = StringIO()
         call_command("liens_epn", "--generer", stdout=sortie)
         self.assertIn("1 lien(s) généré(s)", sortie.getvalue())
+        self.assertIn("/formulaire", sortie.getvalue())
         self.assertEqual(sortie.getvalue().count("/r/"), 1)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", SITE_URL="http://testserver")
+class LienPublicTests(Base):
+    def setUp(self):
+        super().setUp()
+        from django.core.cache import cache
+        cache.clear()
+
+    def test_liste_puis_envoi_du_lien_au_point_focal_officiel(self):
+        d = self.client.get(reverse("api:formulaire_public")).json()
+        self.assertTrue(d["ouverte"])
+        self.assertEqual([e["nom"] for e in d["etablissements"]], ["Office test"])
+        self.assertNotIn("email_contact", d["etablissements"][0])  # l'adresse n'est pas exposée
+        resp = self.post("api:formulaire_public", donnees={"epn": self.epn.pk})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["email_masque"], "f••••@epn.test")
+        self.assertNotIn("/r/", json.dumps(resp.json()))  # le lien personnel n'est jamais renvoyé au navigateur
+        r = Reponse.objects.get(epn=self.epn)
+        self.assertEqual(mail.outbox[0].to, ["focal@epn.test"])
+        self.assertIn(r.lien, mail.outbox[0].body)
+        # Une deuxième demande dans les 5 minutes ne renvoie pas d'e-mail et ne crée pas de second lien.
+        self.post("api:formulaire_public", donnees={"epn": self.epn.pk})
+        self.assertEqual((len(mail.outbox), Reponse.objects.count()), (1, 1))
+
+    def test_etablissement_inconnu_ou_inactif(self):
+        inactif = EPN.objects.create(nom="Fermé", tutelle="T", email_contact="x@epn.test", actif=False)
+        self.assertEqual(self.post("api:formulaire_public", donnees={"epn": inactif.pk}).status_code, 400)
+        self.assertEqual(self.post("api:formulaire_public", donnees={"epn": 9999}).status_code, 400)
+
+    def test_limite_de_demandes(self):
+        for _ in range(10):
+            self.post("api:formulaire_public", donnees={"epn": 9999})
+        self.assertEqual(self.post("api:formulaire_public", donnees={"epn": self.epn.pk}).status_code, 429)
+
+    def test_campagne_fermee(self):
+        self.campagne.date_cloture = timezone.localdate() - timedelta(days=1)
+        self.campagne.save()
+        self.assertFalse(self.client.get(reverse("api:formulaire_public")).json()["ouverte"])
+        self.assertEqual(self.post("api:formulaire_public", donnees={"epn": self.epn.pk}).status_code, 403)
+
+    def test_page_et_config(self):
+        self.assertIn(self.client.get("/formulaire").status_code, (200, 503))
+        self.assertEqual(self.client.get(reverse("api:config")).json()["lien_public"], "http://testserver/formulaire")

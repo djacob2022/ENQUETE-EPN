@@ -3,10 +3,11 @@ import { Check, CircleAlert, FileText, PenLine, Printer, Send } from "lucide-rea
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BoutonTheme from "@/composants/BoutonTheme";
+import { BandeauOfficiel } from "@/composants/Officiel";
 import { api, ErreurApi } from "@/lib/api";
 import { date } from "@/lib/format";
 import { ReponsePublique } from "@/lib/types";
-import { Badge, Bouton, Carte, cx, Logo, useToast } from "@/ui";
+import { Badge, Bouton, Carte, cx, useToast } from "@/ui";
 import { urlApi, useFormulaire } from "./Formulaire";
 import { lisible } from "./Questions";
 
@@ -121,13 +122,14 @@ export function Merci() {
   const { reponse } = useFormulaire();
   return (
     <div className="min-h-screen">
-      <header className="pas-imprimer mx-auto flex max-w-5xl items-center justify-between px-6 py-5"><Logo /><BoutonTheme /></header>
+      <BandeauOfficiel droite={<span className="pas-imprimer"><BoutonTheme /></span>} />
+      <div className="h-8" />
       <main className="mx-auto max-w-3xl px-6 pb-20">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
           className="relative overflow-hidden rounded-2xl border border-trait bg-surface p-10 text-center shadow-flottant">
           <div className="grille-fond pointer-events-none absolute inset-0 opacity-60" />
           <motion.div initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", delay: 0.15, damping: 12 }}
-            className="relative mx-auto grid h-20 w-20 place-items-center rounded-full bg-succes text-white shadow-[0_12px_40px_-8px_rgb(var(--succes)/.6)] dark:text-[#04140d]">
+            className="relative mx-auto grid h-20 w-20 place-items-center rounded-full bg-succes text-white shadow-[0_12px_40px_-8px_rgb(var(--succes)/.6)] dark:text-[#04140c]">
             <motion.svg viewBox="0 0 24 24" className="h-10 w-10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <motion.path d="M5 12.5l4.5 4.5L19 7.5" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.45, duration: 0.5 }} />
             </motion.svg>

@@ -110,6 +110,7 @@ function Coque({ children }: { children: React.ReactNode }) {
 
   const menu = (
     <div className="flex h-full flex-col">
+      <div className="tricolore h-1" aria-hidden />
       <div className="px-5 pb-4 pt-5"><Logo /></div>
       <div className="px-3">
         <label className="mb-1.5 block px-2 text-[11px] font-medium uppercase tracking-wider text-discret" htmlFor="campagne">Campagne</label>
@@ -197,7 +198,7 @@ function Palette({ ouverte, fermer }: { ouverte: boolean; fermer: () => void }) 
     <AnimatePresence>
       {ouverte && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]" role="dialog" aria-modal="true" aria-label="Recherche">
-          <motion.div className="absolute inset-0 bg-[#0b1b33]/30 backdrop-blur-sm" onClick={fermer} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+          <motion.div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={fermer} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
           <motion.div initial={{ opacity: 0, scale: 0.97, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.15 }}
             className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-trait bg-surface shadow-flottant">
             <div className="flex items-center gap-3 border-b border-trait px-4">

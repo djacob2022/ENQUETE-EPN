@@ -23,7 +23,7 @@ export default function Statistiques() {
       <EnTetePage titre="Statistiques"
         sous={d ? `Calculées sur ${d.n} réponse${d.n > 1 ? "s" : ""} ${filtres.toutes ? "(envoyées et en cours)" : "envoyée" + (d.n > 1 ? "s" : "")} · ${campagne.nom}` : "…"}
         actions={<a href={avecParams("/api/gestion/export.xlsx", { campagne: campagne.id, ...filtres })}
-          className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-marque px-4 text-sm font-medium text-white shadow-sm hover:bg-marque-fonce dark:text-[#06101f]">
+          className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-marque px-4 text-sm font-medium text-white shadow-sm hover:bg-marque-fonce dark:text-[#04140c]">
           <Download className="h-4 w-4" /> Exporter en Excel</a>} />
 
       <Carte className="mb-6 flex flex-wrap items-end gap-3 p-4">

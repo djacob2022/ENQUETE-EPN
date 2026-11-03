@@ -47,9 +47,8 @@ export default function Identification() {
   return (
     <div className="mx-auto max-w-3xl">
       <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl bg-[#0b1b33] p-8 text-white shadow-flottant sm:p-10">
-        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#3b82f6]/30 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 left-10 h-64 w-64 rounded-full bg-[#10b981]/20 blur-3xl" />
+        className="motif-officiel relative overflow-hidden rounded-2xl bg-institution p-8 text-white shadow-flottant sm:p-10">
+        <div className="tricolore absolute inset-x-0 top-0 h-1" aria-hidden />
         <p className="relative text-xs font-medium uppercase tracking-[.18em] text-white/60">{reponse.campagne.nom}</p>
         <h1 className="titre-display relative mt-3 text-4xl leading-tight sm:text-5xl">{reponse.epn.nom}</h1>
         <p className="relative mt-3 max-w-xl text-white/75">

@@ -5,8 +5,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Geist", "Inter", "system-ui", "sans-serif"],
-        display: ["'Instrument Serif'", "Georgia", "serif"],
+        sans: ["'Public Sans'", "system-ui", "sans-serif"],
+        display: ["'Public Sans'", "system-ui", "sans-serif"],
         mono: ["'Geist Mono'", "ui-monospace", "monospace"],
       },
       colors: {
@@ -22,6 +22,8 @@ export default {
           fonce: "rgb(var(--marque-fonce) / <alpha-value>)",
           doux: "rgb(var(--marque-doux) / <alpha-value>)",
         },
+        accent: { DEFAULT: "rgb(var(--accent) / <alpha-value>)", fonce: "rgb(var(--accent-fonce) / <alpha-value>)", doux: "rgb(var(--accent-doux) / <alpha-value>)" },
+        institution: "rgb(var(--institution) / <alpha-value>)",
         succes: { DEFAULT: "rgb(var(--succes) / <alpha-value>)", doux: "rgb(var(--succes-doux) / <alpha-value>)" },
         alerte: { DEFAULT: "rgb(var(--alerte) / <alpha-value>)", doux: "rgb(var(--alerte-doux) / <alpha-value>)" },
         danger: { DEFAULT: "rgb(var(--danger) / <alpha-value>)", doux: "rgb(var(--danger-doux) / <alpha-value>)" },
@@ -31,7 +33,7 @@ export default {
         flottant: "0 12px 40px -12px rgb(15 23 42 / 0.28), 0 2px 6px rgb(15 23 42 / 0.06)",
         anneau: "0 0 0 4px rgb(var(--marque) / 0.14)",
       },
-      borderRadius: { xl: "14px", "2xl": "20px" },
+      borderRadius: { xl: "10px", "2xl": "14px" },
       keyframes: {
         miroiter: { "100%": { transform: "translateX(100%)" } },
         apparaitre: { from: { opacity: 0, transform: "translateY(6px)" }, to: { opacity: 1, transform: "none" } },

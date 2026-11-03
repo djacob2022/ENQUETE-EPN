@@ -4,39 +4,47 @@
 
 /* Thème : couleurs en triplets RGB pour permettre les opacités Tailwind (bg-marque/10…). */
 :root {
-  --fond: 246 247 249;
+  --fond: 247 248 246;
   --surface: 255 255 255;
-  --relief: 241 243 246;
-  --encre: 11 27 51;
-  --discret: 84 99 122;
-  --trait: 226 231 238;
-  --marque: 30 86 160;
-  --marque-fonce: 18 58 107;
-  --marque-doux: 231 239 250;
-  --succes: 13 118 82;
-  --succes-doux: 226 244 236;
-  --alerte: 166 77 8;
-  --alerte-doux: 254 243 226;
-  --danger: 190 48 38;
-  --danger-doux: 253 236 234;
+  --relief: 241 243 240;
+  --encre: 17 24 39;
+  --discret: 75 85 99;
+  --trait: 222 226 221;
+  --marque: 0 122 77;
+  --marque-fonce: 0 92 58;
+  --marque-doux: 228 243 235;
+  --accent: 240 120 0;
+  --accent-fonce: 168 76 0;
+  --accent-doux: 255 241 224;
+  --succes: 21 128 61;
+  --succes-doux: 222 245 230;
+  --alerte: 161 98 7;
+  --alerte-doux: 254 243 220;
+  --danger: 185 28 28;
+  --danger-doux: 254 234 234;
+  --institution: 7 54 37;
   color-scheme: light;
 }
 .dark {
-  --fond: 8 13 23;
-  --surface: 14 21 34;
-  --relief: 21 30 46;
-  --encre: 232 237 246;
-  --discret: 150 165 187;
-  --trait: 34 46 66;
-  --marque: 104 152 236;
-  --marque-fonce: 150 184 244;
-  --marque-doux: 24 39 68;
-  --succes: 60 202 145;
-  --succes-doux: 15 46 36;
-  --alerte: 246 170 50;
-  --alerte-doux: 54 37 12;
-  --danger: 248 118 106;
-  --danger-doux: 58 22 20;
+  --fond: 9 14 12;
+  --surface: 16 23 20;
+  --relief: 24 33 29;
+  --encre: 236 240 237;
+  --discret: 156 168 160;
+  --trait: 38 50 44;
+  --marque: 52 199 128;
+  --marque-fonce: 116 224 168;
+  --marque-doux: 15 46 32;
+  --accent: 255 158 64;
+  --accent-fonce: 255 181 110;
+  --accent-doux: 58 36 12;
+  --succes: 74 222 128;
+  --succes-doux: 14 44 26;
+  --alerte: 250 190 70;
+  --alerte-doux: 54 40 10;
+  --danger: 248 113 113;
+  --danger-doux: 60 20 20;
+  --institution: 6 40 28;
   color-scheme: dark;
 }
 
@@ -50,7 +58,12 @@
 
 @layer components {
   .chiffres { font-variant-numeric: tabular-nums; }
-  .titre-display { @apply font-display tracking-tight; font-weight: 400; }
+  .titre-display { @apply font-display font-bold tracking-[-0.02em]; }
+  /* Bandeau tricolore : couleurs nationales, réglables ici. */
+  .tricolore { background: linear-gradient(90deg, rgb(var(--accent)) 0 33.33%, #fff 33.33% 66.66%, rgb(var(--marque)) 66.66% 100%); }
+  .motif-officiel {
+    background-image: repeating-linear-gradient(135deg, rgb(255 255 255 / .035) 0 2px, transparent 2px 14px);
+  }
   .grille-fond {
     background-image:
       linear-gradient(rgb(var(--trait) / .55) 1px, transparent 1px),

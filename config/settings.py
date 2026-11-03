@@ -31,6 +31,10 @@ CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 # Adresse publique utilisée pour construire les liens envoyés par e-mail.
 SITE_URL = os.environ.get("SITE_URL", "http://localhost:8000").rstrip("/")
 NOM_INSTITUTION = os.environ.get("NOM_INSTITUTION", "[Nom de l'institution de tutelle]")
+# Identité officielle affichée dans l'en-tête de toutes les pages (à adapter dans .env).
+PAYS = os.environ.get("PAYS", "République de [Pays]")
+DEVISE = os.environ.get("DEVISE", "[Devise nationale]")
+NOM_MINISTERE = os.environ.get("NOM_MINISTERE", "[Ministère de tutelle]")
 
 INSTALLED_APPS = [
     "django.contrib.admin",

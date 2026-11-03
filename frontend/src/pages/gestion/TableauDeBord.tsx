@@ -56,7 +56,7 @@ export default function TableauDeBord() {
         actions={<>
           <Bouton icone={<BellRing className="h-4 w-4" />} onClick={() => setConfirmer(true)} disabled={!retard}>Relancer les retardataires</Bouton>
           <a href={avecParams("/api/gestion/export.xlsx", { campagne: campagne.id })}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-marque px-4 text-sm font-medium text-white shadow-sm transition hover:bg-marque-fonce dark:text-[#06101f]">
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-marque px-4 text-sm font-medium text-white shadow-sm transition hover:bg-marque-fonce dark:text-[#04140c]">
             <Download className="h-4 w-4" /> Exporter en Excel
           </a>
         </>} />

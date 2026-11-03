@@ -14,11 +14,11 @@ export const cx = clsx;
 
 type Variante = "primaire" | "secondaire" | "fantome" | "danger" | "succes";
 const variantes: Record<Variante, string> = {
-  primaire: "bg-marque text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_1px_2px_rgb(15_23_42/0.2)] hover:bg-marque-fonce dark:text-[#06101f] dark:hover:bg-marque-fonce",
+  primaire: "bg-marque text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_1px_2px_rgb(15_23_42/0.2)] hover:bg-marque-fonce dark:text-[#04140c] dark:hover:bg-marque-fonce",
   secondaire: "bg-surface text-encre border border-trait shadow-sm hover:bg-relief",
   fantome: "text-encre hover:bg-relief",
   danger: "bg-surface text-danger border border-danger/30 hover:bg-danger-doux",
-  succes: "bg-succes text-white hover:brightness-110 dark:text-[#04140d]",
+  succes: "bg-succes text-white hover:brightness-110 dark:text-[#04140c]",
 };
 
 export interface BoutonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -243,7 +243,7 @@ export function Tiroir({ ouvert, fermer, titre, children, largeur = 720 }: {
     <AnimatePresence>
       {ouvert && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-          <motion.div className="absolute inset-0 bg-[#0b1b33]/30 backdrop-blur-[2px]" onClick={fermer}
+          <motion.div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={fermer}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
           <motion.aside
             className="absolute inset-y-0 right-0 flex w-full flex-col border-l border-trait bg-fond shadow-flottant"
@@ -270,7 +270,7 @@ export function Dialogue({ ouvert, fermer, titre, description, children }: {
     <AnimatePresence>
       {ouvert && (
         <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-label={titre}>
-          <motion.div className="absolute inset-0 bg-[#0b1b33]/35 backdrop-blur-sm" onClick={fermer}
+          <motion.div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={fermer}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
           <motion.div className="relative w-full max-w-lg rounded-2xl border border-trait bg-surface p-6 shadow-flottant"
             initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97 }}
@@ -327,14 +327,15 @@ export function FournisseurToast({ children }: { children: ReactNode }) {
 export function Logo({ compact = false, clair = false }: { compact?: boolean; clair?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
-      <span className={cx("grid h-9 w-9 place-items-center rounded-[10px] shadow-sm", clair ? "bg-white text-marque" : "bg-marque text-white dark:text-[#06101f]")}>
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
-          <path d="M6 18V6h10M6 12h8M6 18h10" />
+      <span className={cx("grid h-9 w-9 place-items-center rounded-lg", clair ? "bg-white" : "bg-institution")}>
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+          stroke={clair ? "rgb(var(--institution))" : "#fff"}>
+          <path d="M4 20h16M6 20V10M10 20V10M14 20V10M18 20V10M3 10h18L12 4Z" />
         </svg>
       </span>
       {!compact && (
         <span className="leading-tight">
-          <span className={cx("block text-[15px] font-semibold tracking-tight", clair && "text-white")}>Enquête EPN</span>
+          <span className={cx("block text-[15px] font-bold tracking-tight", clair && "text-white")}>Enquête EPN</span>
           <span className={cx("block text-[11px]", clair ? "text-white/70" : "text-discret")}>Établissements Publics Nationaux</span>
         </span>
       )}

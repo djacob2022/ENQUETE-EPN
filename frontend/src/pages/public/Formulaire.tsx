@@ -4,10 +4,11 @@ import { Check, CloudOff, Link2Off, Loader2, Lock, Send, UserRound } from "lucid
 import { createContext, useContext, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import BoutonTheme from "@/composants/BoutonTheme";
+import { Embleme, useConfig } from "@/composants/Officiel";
 import { api, ErreurApi } from "@/lib/api";
 import { date, ilYa, joursRestants } from "@/lib/format";
 import { Questionnaire, ReponsePublique } from "@/lib/types";
-import { Anneau, cx, Logo, Squelette } from "@/ui";
+import { Anneau, cx, Squelette } from "@/ui";
 import Identification from "./Identification";
 import { Merci, Recapitulatif } from "./Recapitulatif";
 import Rubrique from "./Rubrique";
@@ -95,15 +96,17 @@ function Cadre({ children }: { children: React.ReactNode }) {
   const courant = pathname.split("/").filter(Boolean)[2] ?? "";
   const jours = joursRestants(reponse.campagne.date_cloture);
   const base = `/r/${jeton}`;
+  const config = useConfig();
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-trait bg-surface/85 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-trait bg-surface/90 backdrop-blur-xl">
+        <div className="tricolore h-1" aria-hidden />
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
-          <Logo compact />
+          <Embleme className="h-9 w-8" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold tracking-tight">{reponse.epn.nom}</p>
-            <p className="truncate text-xs text-discret">{reponse.campagne.nom}</p>
+            <p className="truncate text-sm font-bold tracking-tight">{reponse.epn.nom}</p>
+            <p className="truncate text-xs text-discret">{config?.pays ? `${config.pays} · ` : ""}{reponse.campagne.nom}</p>
           </div>
           <IndicateurSauvegarde />
           <BoutonTheme />
@@ -157,7 +160,7 @@ function Etape({ to, actif, fait, numero, children }: { to: string; actif: boole
         className={cx("group flex items-center gap-3 rounded-xl px-2 py-2 text-sm transition",
           actif ? "bg-surface font-semibold text-encre shadow-carte ring-1 ring-trait" : "text-discret hover:text-encre")}>
         <span className={cx("relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold ring-4 ring-fond transition",
-          actif ? "bg-marque text-white dark:text-[#06101f]" : fait ? "bg-succes text-white dark:text-[#04140d]" : "border border-trait bg-surface text-discret")}
+          actif ? "bg-marque text-white dark:text-[#04140c]" : fait ? "bg-succes text-white dark:text-[#04140c]" : "border border-trait bg-surface text-discret")}
           style={{ marginLeft: 6 }}>
           {fait && !actif ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : numero}
         </span>

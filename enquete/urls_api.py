@@ -7,6 +7,8 @@ app_name = "api"
 urlpatterns = [
     path("csrf/", api.csrf, name="csrf"),
     path("questionnaire/", api.questionnaire, name="questionnaire"),
+    path("config/", api.config, name="config"),
+    path("formulaire/", api.formulaire_public, name="formulaire_public"),
     # Parcours du répondant
     path("r/<str:jeton>/", api.reponse, name="reponse"),
     path("r/<str:jeton>/identification/", api.identification, name="identification"),

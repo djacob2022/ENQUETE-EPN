@@ -19,7 +19,8 @@ def _destinataires(reponse):
 
 
 def _envoyer(reponse, type_envoi, gabarit, sujet, par=""):
-    contexte = {"reponse": reponse, "campagne": reponse.campagne, "institution": settings.NOM_INSTITUTION}
+    contexte = {"reponse": reponse, "campagne": reponse.campagne, "institution": settings.NOM_INSTITUTION,
+                "lien_public": settings.SITE_URL + "/formulaire"}
     destinataires = _destinataires(reponse)
     envoi = Envoi(reponse=reponse, type=type_envoi, destinataires=", ".join(destinataires), par=par)
     try:
@@ -44,6 +45,12 @@ def envoyer_invitation(reponse, par=""):
         reponse.date_invitation = timezone.now()
         reponse.save(update_fields=["date_invitation"])
     return ok
+
+
+def envoyer_acces(reponse):
+    """Lien personnel demandé depuis le lien public : toujours envoyé à l'adresse officielle du point focal."""
+    return _envoyer(reponse, Envoi.Type.ACCES, "acces",
+                    f"[{reponse.campagne}] Votre lien d'accès au questionnaire de {reponse.epn.nom}", par="formulaire public")
 
 
 def envoyer_relance(reponse, par=""):

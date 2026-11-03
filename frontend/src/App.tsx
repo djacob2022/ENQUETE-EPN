@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import Accueil from "./pages/public/Accueil";
+import AccesFormulaire from "./pages/public/AccesFormulaire";
 import Formulaire from "./pages/public/Formulaire";
 import { Squelette } from "./ui";
 
@@ -16,7 +16,8 @@ export default function App() {
   return (
     <Suspense fallback={<Chargement />}>
       <Routes>
-        <Route path="/" element={<Accueil />} />
+        <Route path="/" element={<AccesFormulaire />} />
+        <Route path="/formulaire" element={<AccesFormulaire />} />
         <Route path="/r/:jeton/*" element={<Formulaire />} />
         <Route path="/connexion" element={<Connexion />} />
         <Route path="/gestion/*" element={<Gestion />} />
