@@ -1,4 +1,5 @@
 """Protections transversales : adresse IP réelle, limites anti-abus, connexion, journaux, taille des requêtes."""
+import ipaddress
 from datetime import timedelta
 
 from django.conf import settings
@@ -10,15 +11,30 @@ from django.utils import timezone
 
 # --- Adresse IP du visiteur ----------------------------------------------------------------------
 
+def _ip_valide(texte):
+    try:
+        return str(ipaddress.ip_address(texte))
+    except ValueError:
+        return None
+
+
 def ip_client(request):
-    """Adresse du visiteur ; derrière N proxys de confiance, la N-ième en partant de la fin de X-Forwarded-For."""
+    """Adresse du visiteur ; derrière N proxys de confiance, la N-ième en partant de la fin de X-Forwarded-For.
+
+    X-Forwarded-For n'est cru que si la connexion vient d'un réseau privé (le proxy) et si la valeur est une
+    adresse IP valide : si NB_PROXYS_DE_CONFIANCE est réglé à tort alors que le site est exposé directement,
+    un visiteur ne peut ni choisir son adresse (et contourner les limites) ni provoquer une erreur.
+    """
     if request is None:
         return "0.0.0.0"
+    directe = _ip_valide(request.META.get("REMOTE_ADDR", "")) or "0.0.0.0"
     n = settings.NB_PROXYS_DE_CONFIANCE
+    if not n or not ipaddress.ip_address(directe).is_private:
+        return directe
     chaine = [x.strip() for x in request.META.get("HTTP_X_FORWARDED_FOR", "").split(",") if x.strip()]
-    if n and len(chaine) >= n:
-        return chaine[-n]
-    return request.META.get("REMOTE_ADDR", "0.0.0.0")
+    if len(chaine) >= n:
+        return _ip_valide(chaine[-n]) or directe
+    return directe
 
 
 def trop_de_demandes_acces(request, limite=10, fenetre=timedelta(minutes=10)):
@@ -94,3 +110,32 @@ class LimiteTailleRequete:
             mo = settings.TAILLE_MAX_REQUETE // (1024 * 1024)
             return JsonResponse({"erreur": f"Envoi trop volumineux : {mo} Mo maximum par envoi."}, status=413)
         return self.get_response(request)
+
+
+# --- Politique de sécurité du contenu (CSP) -----------------------------------------------------------
+
+CSP = "; ".join([
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",  # styles calculés par les animations
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+])
+
+
+class PolitiqueContenu:
+    """Le navigateur n'exécute que les scripts du site : une injection de code éventuelle reste sans effet."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        reponse = self.get_response(request)
+        reponse.headers.setdefault("Content-Security-Policy", CSP)
+        reponse.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        return reponse

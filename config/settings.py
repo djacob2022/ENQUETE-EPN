@@ -52,6 +52,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "enquete.securite.PolitiqueContenu",
     "enquete.securite.LimiteTailleRequete",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -151,6 +152,12 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", False)
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "ENQUETE-EPN <no-reply@enquete-epn.local>")
+
+# HSTS : le navigateur refuse ensuite tout retour en http:// (activé par défaut quand SITE_URL est en https).
+SECURE_HSTS_SECONDS = int(os.environ.get("HSTS_SECONDES", "31536000" if SITE_URL.startswith("https://") else "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("HSTS_SOUS_DOMAINES", False)
+SECURE_SSL_REDIRECT = env_bool("REDIRECTION_HTTPS", False)
+SILENCED_SYSTEM_CHECKS = ["security.W004"] if SITE_URL.startswith("http://") else []
 
 if not DEBUG:
     SESSION_COOKIE_SECURE = env_bool("COOKIES_SECURE", True)

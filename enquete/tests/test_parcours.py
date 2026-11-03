@@ -496,3 +496,52 @@ class PerimetreEtRevocationTests(Base):
         u = User.objects.get(username="sup2")
         self.assertTrue(u.is_staff)
         self.assertEqual(tutelles_autorisees(u), ["Santé", "Éducation"])
+
+
+class DurcissementTests(Base):
+    def test_politique_de_contenu_et_en_tetes(self):
+        resp = self.client.get(reverse("api:config"))
+        csp = resp["Content-Security-Policy"]
+        self.assertIn("script-src 'self'", csp)
+        self.assertNotIn("unsafe-inline' https://fonts.googleapis.com; script", csp)
+        self.assertIn("frame-ancestors 'none'", csp)
+        self.assertIn("Permissions-Policy", resp.headers)
+
+    @override_settings(SECURE_HSTS_SECONDS=31536000)
+    def test_hsts_en_https(self):
+        resp = self.client.get(reverse("api:config"), secure=True)
+        self.assertEqual(resp["Strict-Transport-Security"], "max-age=31536000")
+
+    @override_settings(NB_PROXYS_DE_CONFIANCE=1)
+    def test_x_forwarded_for_ignore_si_le_site_est_expose_directement(self):
+        from django.test import RequestFactory
+        from enquete.securite import ip_client
+        rf = RequestFactory()
+        # Connexion directe depuis Internet : l'en-tête fourni par le visiteur n'est pas cru.
+        self.assertEqual(ip_client(rf.get("/", REMOTE_ADDR="41.202.1.5", HTTP_X_FORWARDED_FOR="1.2.3.4")), "41.202.1.5")
+        # Derrière le proxy (réseau privé) : l'adresse réelle est retenue…
+        self.assertEqual(ip_client(rf.get("/", REMOTE_ADDR="172.18.0.3", HTTP_X_FORWARDED_FOR="41.9.9.9")), "41.9.9.9")
+        # … sauf si elle n'est pas une adresse IP valide.
+        self.assertEqual(ip_client(rf.get("/", REMOTE_ADDR="172.18.0.3", HTTP_X_FORWARDED_FOR="<script>")), "172.18.0.3")
+
+    @override_settings(DEBUG=False, SITE_URL="https://enquete.example", SESSION_COOKIE_SECURE=False, EMAIL_HOST="mailpit")
+    def test_alertes_reglages_de_production(self):
+        import os
+        from enquete.checks import reglages_de_production
+        ancien = os.environ.get("CHARGER_DONNEES_DEMO")
+        os.environ["CHARGER_DONNEES_DEMO"] = "1"
+        try:
+            ids = {a.id for a in reglages_de_production(None)}
+        finally:
+            os.environ.pop("CHARGER_DONNEES_DEMO") if ancien is None else os.environ.__setitem__("CHARGER_DONNEES_DEMO", ancien)
+        self.assertEqual(ids, {"enquete.W001", "enquete.W002", "enquete.W003"})
+
+    def test_import_excel_avec_lecteur_xml_protege(self):
+        import openpyxl.xml
+        self.assertTrue(openpyxl.xml.DEFUSEDXML)
+
+    def test_exemple_env_sur_par_defaut(self):
+        from pathlib import Path
+        exemple = (Path(__file__).resolve().parents[2] / ".env.example").read_text(encoding="utf-8")
+        self.assertIn("\nCOOKIES_SECURE=1", exemple)
+        self.assertIn("\nCHARGER_DONNEES_DEMO=0", exemple)

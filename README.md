@@ -93,7 +93,9 @@ Services : `web` (Django + Gunicorn), `db` (PostgreSQL 16), `mailpit` (e-mails d
 - `DJANGO_DEBUG=0`, une `DJANGO_SECRET_KEY` longue et aléatoire, `DJANGO_ALLOWED_HOSTS` et `SITE_URL` = le domaine réel.
 - Placer un proxy HTTPS (Nginx, Traefik…) devant le port 8000, puis `COOKIES_SECURE=1` et `NB_PROXYS_DE_CONFIANCE=1`. Ce dernier réglage permet à la limite anti-abus du lien unique de reconnaître chaque visiteur, et non le seul proxy.
 - Renseigner le serveur SMTP réel (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, identifiants) et démarrer **sans** `--profile dev` (Mailpit reste arrêté) : `docker compose up -d --build`.
-- Mettre `CHARGER_DONNEES_DEMO=0`.
+- Garder `CHARGER_DONNEES_DEMO=0` et `COOKIES_SECURE=1` (valeurs par défaut de `.env.example` ; seul le script `lancer` les assouplit pour un test sur poste).
+- Avec `SITE_URL` en `https://`, HSTS est activé automatiquement (un an). `REDIRECTION_HTTPS=1` redirige le http vers le https si le proxy ne le fait pas.
+- Vérifier la configuration avant l'ouverture : `docker compose exec web python manage.py check --deploy`. Les alertes `enquete.W001` à `W003` signalent un réglage de démonstration oublié.
 - Limiter aussi la taille des envois dans le proxy (Nginx : `client_max_body_size 12m;`). L'application refuse déjà au-delà de 12 Mo.
 
 ### Sécurité intégrée
@@ -102,6 +104,9 @@ Services : `web` (Django + Gunicorn), `db` (PostgreSQL 16), `mailpit` (e-mails d
 - Connexion : après 5 mots de passe erronés, le compte est bloqué 15 minutes (20 échecs pour une même adresse IP), sur l'API comme sur `/django-admin/`.
 - Journaux : les liens personnels n'y apparaissent jamais en clair (`/r/***`).
 - Envois : toute requête de plus de 12 Mo est refusée avant d'être lue.
+- Navigateur : politique de sécurité du contenu (seuls les scripts du site s'exécutent), HSTS en https, page non intégrable dans un autre site.
+- Adresse IP : `X-Forwarded-For` n'est pris en compte que s'il vient du proxy (réseau privé) et contient une adresse valide.
+- Import Excel : lecture XML protégée (`defusedxml`).
 
 ## Développement sans Docker
 

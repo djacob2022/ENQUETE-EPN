@@ -22,8 +22,10 @@ if [ ! -f .env ]; then
   sed -e "s|^DJANGO_SECRET_KEY=.*|DJANGO_SECRET_KEY=$(aleatoire 50)|" \
       -e "s|^DJANGO_SUPERUSER_PASSWORD=.*|DJANGO_SUPERUSER_PASSWORD=$MDP_ADMIN|" \
       -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(aleatoire 24)|" \
+      -e "s|^COOKIES_SECURE=.*|COOKIES_SECURE=0|" \
+      -e "s|^CHARGER_DONNEES_DEMO=.*|CHARGER_DONNEES_DEMO=1|" \
       .env.example > .env
-  echo "Fichier .env créé. Identifiants administrateur : admin / $MDP_ADMIN (notez-les)."
+  echo "Fichier .env créé pour un test sur ce poste (données de démonstration, http). Identifiants administrateur : admin / $MDP_ADMIN (notez-les)."
 fi
 
 docker compose --profile dev up -d --build

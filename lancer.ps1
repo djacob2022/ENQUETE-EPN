@@ -29,7 +29,9 @@ if (-not (Test-Path .env)) {
   (Get-Content -Encoding UTF8 .env.example) `
     -replace '^DJANGO_SECRET_KEY=.*', "DJANGO_SECRET_KEY=$(Aleatoire 50)" `
     -replace '^DJANGO_SUPERUSER_PASSWORD=.*', "DJANGO_SUPERUSER_PASSWORD=$mdpAdmin" `
-    -replace '^POSTGRES_PASSWORD=.*', "POSTGRES_PASSWORD=$(Aleatoire 24)" |
+    -replace '^POSTGRES_PASSWORD=.*', "POSTGRES_PASSWORD=$(Aleatoire 24)" `
+    -replace '^COOKIES_SECURE=.*', 'COOKIES_SECURE=0' `
+    -replace '^CHARGER_DONNEES_DEMO=.*', 'CHARGER_DONNEES_DEMO=1' |
     Set-Content -Encoding utf8 .env
   Write-Host "Fichier .env cree. Identifiants administrateur : admin / $mdpAdmin (notez-les)." -ForegroundColor Green
 }
