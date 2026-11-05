@@ -11,6 +11,10 @@ services:
       NB_PROXYS_DE_CONFIANCE: "1"
       CHARGER_DONNEES_DEMO: "0"
 
+  taches:
+    environment:
+      DJANGO_DEBUG: "0"
+
   caddy:
     image: caddy:2.8.4-alpine
     env_file: .env

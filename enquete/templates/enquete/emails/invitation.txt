@@ -1,15 +1,20 @@
 Madame, Monsieur,
 
-Dans le cadre de « {{ campagne.nom }} » (exercice {{ campagne.exercice }}), {{ institution }} invite {{ reponse.epn.nom }} à renseigner le questionnaire sur les Établissements Publics Nationaux.
+{% if texte_invitation %}{{ texte_invitation }}
+
+{% endif %}Dans le cadre de « {{ campagne.nom }} » (exercice {{ campagne.exercice }}), {{ institution }} invite {{ reponse.epn.nom }} à renseigner le questionnaire sur les Établissements Publics Nationaux.
 
 Pour répondre, ouvrez ce lien personnel :
 {{ reponse.lien }}
 
 Vous indiquerez d'abord vos nom, prénom, e-mail et téléphone, puis vous répondrez aux questions. Vos réponses sont enregistrées au fur et à mesure : vous pouvez reprendre plus tard avec le même lien.
 
-Date limite d'envoi : {{ campagne.date_cloture|date:"j F Y" }}.
+Date limite d'envoi : {{ date_limite|date:"j F Y" }}.
 
 Ce lien est propre à votre établissement : merci de ne pas le diffuser.
 
 Cordialement,
-{{ institution }}
+{{ institution }}{% if signature %}
+{{ signature }}{% endif %}{% if assistance %}
+
+Assistance : {{ assistance }}{% endif %}

@@ -1,16 +1,20 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  BarChart3, Building2, CalendarRange, ClipboardList, CornerDownLeft, Inbox, LayoutDashboard, Link2, LogOut, Menu, Search, X,
+  BarChart3, Bell, Building2, CalendarRange, CircleHelp, ClipboardList, CornerDownLeft, History, Inbox, LayoutDashboard, Link2,
+  LogOut, Menu, Search, Settings, UsersRound, X,
 } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import BoutonTheme from "@/composants/BoutonTheme";
 import { api, avecParams, ErreurApi } from "@/lib/api";
-import { initiales } from "@/lib/format";
-import { Campagne, Moi, Options, ReponseResume } from "@/lib/types";
+import { ilYa, initiales } from "@/lib/format";
+import { Campagne, Moi, Notification, Options, Permission, ReponseResume } from "@/lib/types";
 import { Avatar, Bouton, cx, Kbd, Logo, Squelette } from "@/ui";
 import Campagnes from "./Campagnes";
+import Comptes from "./Comptes";
+import Journal from "./Journal";
+import Parametres from "./Parametres";
 import Liens from "./Liens";
 import QuestionnaireApercu from "./QuestionnaireApercu";
 import Repertoire from "./Repertoire";
@@ -27,15 +31,21 @@ interface ContexteGestion {
 const Ctx = createContext<ContexteGestion | null>(null);
 export const useGestion = () => useContext(Ctx)!;
 
-const NAVIGATION = [
+type Lien = { to: string; libelle: string; icone: typeof Inbox; fin?: boolean; droit?: Permission; section?: string };
+const NAVIGATION: Lien[] = [
   { to: "/gestion", libelle: "Tableau de bord", icone: LayoutDashboard, fin: true },
-  { to: "/gestion/reponses", libelle: "Réponses", icone: Inbox },
-  { to: "/gestion/liens", libelle: "Liens et invitations", icone: Link2 },
+  { to: "/gestion/reponses", libelle: "Réponses", icone: Inbox, droit: "voir_nominatif" },
+  { to: "/gestion/liens", libelle: "Liens et invitations", icone: Link2, droit: "gerer_liens" },
   { to: "/gestion/statistiques", libelle: "Statistiques", icone: BarChart3 },
-  { to: "/gestion/epn", libelle: "Répertoire des EPN", icone: Building2 },
-  { to: "/gestion/campagnes", libelle: "Campagnes", icone: CalendarRange },
+  { to: "/gestion/epn", libelle: "Répertoire des EPN", icone: Building2, droit: "voir_nominatif" },
+  { to: "/gestion/campagnes", libelle: "Campagnes", icone: CalendarRange, section: "Paramétrage" },
   { to: "/gestion/questionnaire", libelle: "Questionnaire", icone: ClipboardList },
+  { to: "/gestion/comptes", libelle: "Comptes et rôles", icone: UsersRound, droit: "gerer_comptes", section: "Administration" },
+  { to: "/gestion/journal", libelle: "Journal d'audit", icone: History, droit: "voir_journal" },
+  { to: "/gestion/parametres", libelle: "Paramètres", icone: Settings, droit: "parametrer" },
 ];
+const navigationDe = (moi: Moi) => NAVIGATION.filter((n) => !n.droit || moi.permissions.includes(n.droit));
+export const peut = (moi: Moi, droit: Permission) => moi.permissions.includes(droit);
 
 export default function Gestion() {
   const { pathname } = useLocation();
@@ -78,6 +88,9 @@ export default function Gestion() {
           <Route path="epn" element={<Repertoire />} />
           <Route path="campagnes" element={<Campagnes />} />
           <Route path="questionnaire" element={<QuestionnaireApercu />} />
+          <Route path="comptes" element={<Comptes />} />
+          <Route path="journal" element={<Journal />} />
+          <Route path="parametres" element={<Parametres />} />
           <Route path="*" element={<Navigate to="/gestion" replace />} />
         </Routes>
       </Coque>
@@ -128,9 +141,10 @@ function Coque({ children }: { children: React.ReactNode }) {
         className="mx-3 mt-3 flex h-10 items-center gap-2 rounded-[10px] border border-trait px-3 text-sm text-discret transition hover:bg-relief">
         <Search className="h-4 w-4" /> <span className="flex-1 text-left">Rechercher…</span> <Kbd>Ctrl K</Kbd>
       </button>
-      <nav className="mt-5 flex-1 space-y-0.5 px-3" aria-label="Navigation principale">
-        {NAVIGATION.map((n) => (
-          <NavLink key={n.to} to={n.to} end={n.fin}
+      <nav className="defilement-fin mt-5 flex-1 space-y-0.5 overflow-y-auto px-3" aria-label="Navigation principale">
+        {navigationDe(moi).map((n) => (<div key={n.to}>
+          {n.section && <p className="mb-1 mt-4 px-3 text-[11px] font-medium uppercase tracking-wider text-discret">{n.section}</p>}
+          <NavLink to={n.to} end={n.fin}
             className={({ isActive }) => cx("group relative flex h-10 items-center gap-3 rounded-[10px] px-3 text-sm transition",
               isActive ? "bg-marque-doux font-semibold text-marque" : "text-discret hover:bg-relief hover:text-encre")}>
             {({ isActive }) => (<>
@@ -138,18 +152,26 @@ function Coque({ children }: { children: React.ReactNode }) {
               <n.icone className="h-[18px] w-[18px]" />{n.libelle}
             </>)}
           </NavLink>
-        ))}
+        </div>))}
+        <a href="/aide" target="_blank" rel="noopener" className="mt-3 flex h-10 items-center gap-3 rounded-[10px] px-3 text-sm text-discret hover:bg-relief hover:text-encre">
+          <CircleHelp className="h-[18px] w-[18px]" />Aide et guide
+        </a>
       </nav>
-      <div className="m-3 flex items-center gap-3 rounded-xl border border-trait p-3">
-        <Avatar texte={initiales(moi.nom)} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{moi.nom}</p>
-          <p className="truncate text-xs text-discret" title={moi.perimetre?.join(", ")}>
-            {moi.perimetre ? `Superviseur · ${moi.perimetre.join(", ")}` : "Administrateur d'enquête"}
-          </p>
+      <div className="m-3 rounded-xl border border-trait p-3">
+        <div className="flex items-center gap-3">
+          <Avatar texte={initiales(moi.nom)} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{moi.nom}</p>
+            <p className="truncate text-xs text-discret" title={moi.perimetre?.join(", ")}>
+              {moi.role_libelle}{moi.perimetre ? ` · ${moi.perimetre.join(", ")}` : ""}
+            </p>
+          </div>
         </div>
-        <BoutonTheme />
-        <Bouton variante="fantome" taille="sm" onClick={deconnecter} aria-label="Se déconnecter"><LogOut className="h-4 w-4" /></Bouton>
+        <div className="mt-2 flex items-center justify-between border-t border-trait pt-2">
+          <Cloche />
+          <BoutonTheme />
+          <Bouton variante="fantome" taille="sm" onClick={deconnecter} aria-label="Se déconnecter"><LogOut className="h-4 w-4" /></Bouton>
+        </div>
       </div>
     </div>
   );
@@ -179,25 +201,25 @@ function Coque({ children }: { children: React.ReactNode }) {
 /* ---------- Palette de commandes : pages et EPN ---------- */
 
 function Palette({ ouverte, fermer }: { ouverte: boolean; fermer: () => void }) {
-  const { campagne } = useGestion();
+  const { campagne, moi: useGestionMoi } = useGestion();
   const naviguer = useNavigate();
   const [q, setQ] = useState("");
   const [index, setIndex] = useState(0);
   const reponses = useQuery({
     queryKey: ["reponses", campagne?.id, {}],
     queryFn: () => api.get<{ reponses: ReponseResume[] }>(avecParams("/api/gestion/reponses/", { campagne: campagne?.id })),
-    enabled: ouverte && !!campagne,
+    enabled: ouverte && !!campagne && peut(useGestionMoi, "voir_nominatif"),
   });
 
   const resultats = useMemo(() => {
     const t = q.trim().toLowerCase();
-    const pages = NAVIGATION.filter((n) => !t || n.libelle.toLowerCase().includes(t))
+    const pages = navigationDe(useGestionMoi).filter((n) => !t || n.libelle.toLowerCase().includes(t))
       .map((n) => ({ cle: n.to, titre: n.libelle, sous: "Page", icone: n.icone, aller: () => naviguer(n.to) }));
     const epn = (reponses.data?.reponses ?? []).filter((r) => t && (r.epn.nom.toLowerCase().includes(t) || r.epn.sigle.toLowerCase().includes(t)))
       .slice(0, 8).map((r) => ({ cle: `r${r.id}`, titre: r.epn.nom, sous: `${r.epn.tutelle} · ${r.statut_libelle}`, icone: Building2,
         aller: () => naviguer(`/gestion/reponses?ouvrir=${r.id}`) }));
     return [...epn, ...pages];
-  }, [q, reponses.data, naviguer]);
+  }, [q, reponses.data, naviguer, useGestionMoi]);
 
   useEffect(() => { setIndex(0); }, [q]);
   useEffect(() => { if (!ouverte) setQ(""); }, [ouverte]);
@@ -240,6 +262,54 @@ function Palette({ ouverte, fermer }: { ouverte: boolean; fermer: () => void }) 
         </div>
       )}
     </AnimatePresence>
+  );
+}
+
+/* ---------- Notifications (F-47) ---------- */
+
+function Cloche() {
+  const { moi } = useGestion();
+  const naviguer = useNavigate();
+  const [ouvert, setOuvert] = useState(false);
+  const cle = `notifications-vues-${moi.identifiant}`;
+  const [vu, setVu] = useState(() => { try { return localStorage.getItem(cle) ?? ""; } catch { return ""; } });
+  const q = useQuery({ queryKey: ["notifications"], queryFn: () => api.get<{ notifications: Notification[] }>("/api/gestion/notifications/"),
+    refetchInterval: 60_000 });
+  const liste = q.data?.notifications ?? [];
+  const nouvelles = liste.filter((n) => n.date > vu).length;
+  function basculer() {
+    setOuvert((o) => !o);
+    if (liste[0]) { setVu(liste[0].date); try { localStorage.setItem(cle, liste[0].date); } catch { /* stockage indisponible */ } }
+  }
+  return (
+    <div className="relative">
+      <Bouton variante="fantome" taille="sm" onClick={basculer} aria-label={`Notifications${nouvelles ? ` (${nouvelles} nouvelles)` : ""}`} aria-expanded={ouvert}>
+        <Bell className="h-4 w-4" />
+        {nouvelles > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-danger" />}
+      </Bouton>
+      <AnimatePresence>
+        {ouvert && (<>
+          <div className="fixed inset-0 z-40" onClick={() => setOuvert(false)} />
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="absolute bottom-11 left-0 z-50 w-80 overflow-hidden rounded-2xl border border-trait bg-surface shadow-flottant">
+            <p className="border-b border-trait px-4 py-3 text-sm font-semibold">Activité récente</p>
+            <ul className="defilement-fin max-h-80 divide-y divide-trait overflow-y-auto">
+              {liste.length === 0 && <li className="px-4 py-6 text-center text-sm text-discret">Rien de nouveau.</li>}
+              {liste.map((n) => (
+                <li key={n.id}>
+                  <button className="w-full px-4 py-3 text-left text-sm hover:bg-relief" disabled={!n.reponse || !peut(moi, "voir_nominatif")}
+                    onClick={() => { setOuvert(false); naviguer(`/gestion/reponses?ouvrir=${n.reponse}`); }}>
+                    <span className="block font-medium">{n.libelle}</span>
+                    <span className="block truncate text-discret">{n.objet}</span>
+                    <span className="text-xs text-discret">{ilYa(n.date)} · {n.auteur}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        </>)}
+      </AnimatePresence>
+    </div>
   );
 }
 

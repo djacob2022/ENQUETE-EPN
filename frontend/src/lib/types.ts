@@ -1,6 +1,6 @@
 export type TypeQuestion =
-  | "texte" | "texte_long" | "url" | "entier" | "montant" | "pourcentage"
-  | "choix" | "choix_multiple" | "oui_non" | "fichier";
+  | "texte" | "texte_long" | "url" | "entier" | "montant" | "pourcentage" | "date"
+  | "choix" | "choix_multiple" | "oui_non" | "echelle" | "tableau" | "fichier";
 
 export interface Choix { valeur: string; libelle: string }
 
@@ -15,11 +15,28 @@ export interface Question {
   aide?: string;
   annee?: boolean;
   choix?: Choix[];
+  si?: { question: string; valeurs: string[] };
+  colonnes?: { code: string; libelle: string; type: "texte" | "nombre" }[];
+  libelle_min?: string;
+  libelle_max?: string;
 }
 
-export interface Module { code: string; titre: string; intro: string; questions: Question[] }
+export interface Module { code: string; titre: string; intro: string; actif?: boolean; questions: Question[] }
 
-export interface Questionnaire { modules: Module[]; fichiers: { accept: string; taille_max: number } }
+export interface Regle { type: "somme" | "inferieur"; total?: string; parties?: string[]; petit?: string; grand?: string; message?: string }
+
+export interface Questionnaire { modules: Module[]; version: number; fichiers: { accept: string; taille_max: number } }
+
+export interface QuestionnaireEditeur extends Questionnaire {
+  regles: Regle[];
+  types: Choix[];
+  modifie_le?: string;
+  modifie_par?: string;
+  avec_reponses: number;
+  campagne: Campagne;
+}
+
+export type LigneTableau = Record<string, string | number | null>;
 
 export interface Campagne {
   id: number;
@@ -29,13 +46,18 @@ export interface Campagne {
   date_cloture: string;
   active: boolean;
   ouverte: boolean;
+  cible_tutelles: string;
+  cible_categories: string;
+  relances_auto: string;
+  version_questionnaire: number;
   total?: number;
   soumis?: number;
+  validees?: number;
 }
 
 export interface Piece { id?: number; code: string; nom: string; taille: number; date_depot: string; url: string }
 
-export type Valeur = string | number | string[] | null | undefined;
+export type Valeur = string | number | string[] | LigneTableau[] | null | undefined;
 
 export interface Identification { nom: string; prenom: string; fonction: string; email: string; telephone: string }
 
@@ -52,13 +74,16 @@ export interface ReponsePublique {
   pieces: Record<string, Piece>;
   date_soumission: string | null;
   date_modification: string | null;
+  date_limite: string;
+  commentaires: Record<string, string>;
+  precedente: number | null;
 }
 
-export type Statut = "invite" | "en_cours" | "soumis";
+export type Statut = "invite" | "en_cours" | "soumis" | "en_revue" | "a_corriger" | "valide";
 
 export interface EPN {
   id: number; nom: string; sigle: string; categorie: string; tutelle: string; region: string;
-  email_contact: string; actif: boolean;
+  secteur: string; email_contact: string; actif: boolean; etat: "actif" | "liquidation" | "dissous"; etat_libelle: string;
 }
 
 export interface ReponseResume {
@@ -77,12 +102,20 @@ export interface ReponseResume {
   nombre_relances: number;
   date_derniere_relance: string | null;
   lien: string;
+  date_validation: string | null;
+  valide_par: string;
+  date_limite: string | null;
+  a_des_commentaires: boolean;
 }
 
 export interface ReponseDetail extends ReponseResume {
   campagne: Campagne;
   modules: { code: string; titre: string; complet: boolean;
-    lignes: { code: string; libelle: string; type: TypeQuestion; valeur: string; piece?: Piece | null }[] }[];
+    lignes: { code: string; libelle: string; type: TypeQuestion; valeur: string; piece?: Piece | null;
+      precedent?: string; ecart?: number; anomalie?: boolean }[] }[];
+  commentaires: Record<string, string>;
+  exercice_precedent: number | null;
+  export_url: string;
   pieces: Piece[];
   zip_url: string | null;
   envois: { type: string; date: string; succes: boolean; destinataires: string; par: string }[];
@@ -96,7 +129,13 @@ export interface TableauDeBord {
   invites: number;
   compte: Record<Statut, number>;
   taux: number;
+  taux_validation: number;
   sans_lien: number;
+  nombre_epn: number;
+  base_indicateurs: "validees" | "envoyees";
+  n_indicateurs: number;
+  a_examiner: ReponseResume[];
+  par_region: TauxGroupe[];
   effectif_total: number;
   budget_total: number;
   par_tutelle: TauxGroupe[];
@@ -112,20 +151,52 @@ export interface Options {
   courante: Campagne | null;
   tutelles: string[];
   regions: string[];
+  secteurs: string[];
   categories: Choix[];
+  etats: Choix[];
   statuts: Choix[];
+  roles: Choix[];
 }
 
-export interface StatNumerique { n: number; somme?: number; moyenne?: number; mediane?: number; min?: number; max?: number; ecart_type?: number }
+export interface StatNumerique {
+  n: number; somme?: number; moyenne?: number; mediane?: number; min?: number; max?: number; ecart_type?: number;
+  q1?: number; q3?: number; histogramme?: { de: number; a: number; effectif: number }[];
+}
 export interface StatFrequence { n: number; lignes: { code: string; libelle: string; effectif: number; pourcentage: number }[] }
 
 export interface Statistiques {
   campagne: Campagne;
   n: number;
-  blocs: { code: string; titre: string; questions: ({ code: string; libelle: string; type: TypeQuestion } &
-    ({ genre: "numerique"; stats: StatNumerique } | { genre: "frequence"; stats: StatFrequence }))[] }[];
+  base: "validees" | "envoyees" | "toutes" | "statut";
+  blocs: { code: string; titre: string; questions: ({ code: string; libelle: string; type: TypeQuestion; unite?: string } &
+    ({ genre: "numerique"; stats: StatNumerique; precedent?: StatNumerique } | { genre: "frequence"; stats: StatFrequence }))[] }[];
   indicateurs: Indicateur[];
+  precedente: { campagne: Campagne; n: number; indicateurs: Indicateur[] } | null;
   historique: { libelle: string; taux: number }[];
+  variables: { valeur: string; libelle: string; groupe: string }[];
 }
 
-export interface Moi { identifiant: string; nom: string; superutilisateur: boolean; perimetre: string[] | null; administrateur: boolean }
+export interface TableauCroise {
+  ligne: string; colonne: string; colonnes: string[]; n: number;
+  lignes: { libelle: string; effectifs: number[]; total: number; pourcentages: number[] }[];
+}
+
+export type Permission = "voir_nominatif" | "exporter" | "valider" | "relancer" | "gerer_liens" | "gerer_campagnes"
+  | "gerer_questionnaire" | "gerer_repertoire" | "voir_journal" | "gerer_comptes" | "parametrer";
+
+export interface Moi {
+  identifiant: string; nom: string; email: string; superutilisateur: boolean; perimetre: string[] | null;
+  administrateur: boolean; role: string; role_libelle: string; permissions: Permission[]; session_minutes: number;
+}
+
+export interface Compte {
+  id: number; identifiant: string; email: string; prenom: string; nom: string; actif: boolean; superutilisateur: boolean;
+  role: string; tutelles: string[]; derniere_connexion: string | null; mot_de_passe_defini: boolean;
+}
+
+export interface LigneJournal {
+  id: number; date: string; auteur: string; action: string; libelle: string; objet: string;
+  detail: Record<string, unknown>; ip: string | null;
+}
+
+export interface Notification { id: number; date: string; action: string; libelle: string; objet: string; auteur: string; reponse?: number }

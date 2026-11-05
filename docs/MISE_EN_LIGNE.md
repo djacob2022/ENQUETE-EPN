@@ -33,7 +33,6 @@ Récupérez le code :
 sudo apt-get update && sudo apt-get install -y git
 git clone https://github.com/djacob2022/ENQUETE-EPN.git
 cd ENQUETE-EPN
-git checkout claude/tender-cannon-9lvbtv
 ```
 
 Lancez l'installation :
@@ -105,7 +104,7 @@ sudo sh deploiement/mettre-a-jour.sh
 2. **Créer les comptes de l'équipe.** Un superviseur ne voit que ses tutelles ; le mot de passe est demandé à l'écran :
    ```bash
    sudo docker compose -f docker-compose.yml -f deploiement/docker-compose.prod.yml exec web \
-     python manage.py compte_equipe f.kone --nom "Fatou Koné" --tutelle "Santé"
+     python manage.py compte_equipe f.kone --role superviseur --nom "Fatou Koné" --tutelle "Santé"
    ```
 3. **Importer les EPN** depuis un fichier Excel : menu **Répertoire des EPN**.
 4. **Créer la campagne** (menu **Campagnes**), avec ses dates d'ouverture et de clôture.

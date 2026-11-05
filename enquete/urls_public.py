@@ -8,5 +8,5 @@ app_name = "public"
 urlpatterns = [
     path("", application, name="page_accueil"),
     path("r/<str:jeton>/", application, name="accueil"),
-    re_path(r"^(?:r|gestion|connexion|formulaire)(?:/.*)?$", application, name="application"),
+    re_path(r"^(?:r|gestion|connexion|formulaire|aide|mot-de-passe|mot-de-passe-oublie)(?:/.*)?$", application, name="application"),
 ]

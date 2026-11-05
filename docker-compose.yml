@@ -9,6 +9,8 @@ name: enquete-epn
 services:
   web:
     build: .
+    # Image versionnée (section 8.3) : ENQUETE_VERSION=1.1.0 docker compose build, puis docker compose push vers le registre.
+    image: ${REGISTRE:-enquete-epn}/application:${ENQUETE_VERSION:-1.1.0}
     env_file: .env
     environment:
       POSTGRES_HOST: db
@@ -19,6 +21,21 @@ services:
       - media:/app/media   # pièces jointes déposées par les EPN
     depends_on:
       db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Tâches planifiées (F-19) : relances automatiques J-7, J-2, J+1 selon chaque campagne, vérifiées toutes les heures.
+  # Même image que « web » ; démarre une fois les migrations appliquées par « web ».
+  taches:
+    image: ${REGISTRE:-enquete-epn}/application:${ENQUETE_VERSION:-1.1.0}
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    entrypoint: ["python", "manage.py", "taches", "--boucle"]
+    healthcheck:
+      disable: true
+    depends_on:
+      web:
         condition: service_healthy
     restart: unless-stopped
 

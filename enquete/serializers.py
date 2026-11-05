@@ -2,43 +2,53 @@
 from django.urls import reverse
 
 from .pieces import ACCEPT, TAILLE_MAX
-from .questionnaire import MODULES, OUI_NON, affichage
-from .services import etat
+from .questionnaire import OUI_NON, TYPES, TYPES_NUMERIQUES, affichage
+from .services import etat, reponse_precedente
 
 
 def _date(d):
     return d.isoformat() if d else None
 
 
-def questionnaire():
-    modules = []
-    for m in MODULES:
-        questions = []
-        for q in m["questions"]:
-            item = {k: q[k] for k in ("code", "libelle", "type") }
-            item["obligatoire"] = q.get("obligatoire", True)
-            for cle in ("min", "max", "unite", "aide", "annee"):
-                if cle in q:
-                    item[cle] = q[cle]
-            if q["type"] == "oui_non":
-                item["choix"] = [{"valeur": v, "libelle": l} for v, l in OUI_NON]
-            elif "choix" in q:
-                item["choix"] = [{"valeur": v, "libelle": l} for v, l in q["choix"]]
-            questions.append(item)
-        modules.append({"code": m["code"], "titre": m["titre"], "intro": m.get("intro", ""), "questions": questions})
-    return {"modules": modules, "fichiers": {"accept": ACCEPT, "taille_max": TAILLE_MAX}}
+def question(q):
+    item = {k: q[k] for k in ("code", "libelle", "type")}
+    item["obligatoire"] = q.get("obligatoire", True)
+    for cle in ("min", "max", "unite", "aide", "annee", "si", "colonnes", "libelle_min", "libelle_max"):
+        if cle in q:
+            item[cle] = q[cle]
+    if q["type"] == "oui_non":
+        item["choix"] = [{"valeur": v, "libelle": l} for v, l in OUI_NON]
+    elif "choix" in q:
+        item["choix"] = [{"valeur": v, "libelle": l} for v, l in q["choix"]]
+    return item
+
+
+def questionnaire(campagne_obj, tous=False):
+    """Questionnaire d'une campagne. `tous` : modules désactivés compris (éditeur)."""
+    q = campagne_obj.q
+    modules = [{"code": m["code"], "titre": m["titre"], "intro": m.get("intro", ""), "actif": m.get("actif", True),
+                "questions": [question(x) for x in m["questions"]]}
+               for m in (q.tous_les_modules if tous else q.modules)]
+    sortie = {"modules": modules, "version": q.version, "fichiers": {"accept": ACCEPT, "taille_max": TAILLE_MAX}}
+    if tous:
+        sortie |= {"regles": q.regles, "types": [{"valeur": k, "libelle": v} for k, v in TYPES.items()],
+                   "modifie_le": q.definition.get("modifie_le"), "modifie_par": q.definition.get("modifie_par", "")}
+    return sortie
 
 
 def campagne(c):
     if c is None:
         return None
     return {"id": c.pk, "nom": c.nom, "exercice": c.exercice, "date_ouverture": _date(c.date_ouverture),
-            "date_cloture": _date(c.date_cloture), "active": c.active, "ouverte": c.est_ouverte}
+            "date_cloture": _date(c.date_cloture), "active": c.active, "ouverte": c.est_ouverte,
+            "cible_tutelles": c.cible_tutelles, "cible_categories": c.cible_categories,
+            "relances_auto": c.relances_auto, "version_questionnaire": c.q.version}
 
 
 def epn(e):
     return {"id": e.pk, "nom": e.nom, "sigle": e.sigle, "categorie": e.categorie, "tutelle": e.tutelle,
-            "region": e.region, "email_contact": e.email_contact, "actif": e.actif}
+            "region": e.region, "secteur": e.secteur, "email_contact": e.email_contact, "actif": e.actif,
+            "etat": e.etat, "etat_libelle": e.get_etat_display()}
 
 
 def piece_publique(p):
@@ -71,6 +81,9 @@ def reponse_publique(r):
         "pieces": {p.code: piece_publique(p) for p in r.pieces.all()},
         "date_soumission": _date(r.date_soumission),
         "date_modification": _date(r.date_modification),
+        "date_limite": _date(r.date_limite_effective),
+        "commentaires": r.commentaires if r.statut == "a_corriger" else {},
+        "precedente": precedente.campagne.exercice if (precedente := reponse_precedente(r)) else None,
     }
 
 
@@ -81,22 +94,41 @@ def reponse_resume(r):
         "fonction": r.fonction, "date_invitation": _date(r.date_invitation),
         "date_soumission": _date(r.date_soumission), "date_modification": _date(r.date_modification),
         "nombre_relances": r.nombre_relances, "date_derniere_relance": _date(r.date_derniere_relance),
-        "lien": r.lien,
+        "lien": r.lien, "date_validation": _date(r.date_validation), "valide_par": r.valide_par,
+        "date_limite": _date(r.date_limite), "a_des_commentaires": bool(r.commentaires),
     }
+
+
+def anonymiser(resume):
+    """Version sans données nominatives (rôle « lecteur ») : ni répondant ni coordonnées ni lien."""
+    return resume | {"repondant": "", "email": "", "telephone": "", "fonction": "", "lien": ""}
 
 
 def reponse_detail(r):
     pieces = {p.code: piece_admin(p) for p in r.pieces.all()}
+    precedente = reponse_precedente(r)
     modules = []
-    for m in MODULES:
-        modules.append({
-            "code": m["code"], "titre": m["titre"], "complet": m["code"] in r.modules_completes,
-            "lignes": [{"code": q["code"], "libelle": q["libelle"], "type": q["type"],
-                        "valeur": affichage(q, r.donnees.get(q["code"])), "piece": pieces.get(q["code"])}
-                       for q in m["questions"]],
-        })
+    for m in r.campagne.q.modules:
+        lignes = []
+        for q in m["questions"]:
+            ligne = {"code": q["code"], "libelle": q["libelle"], "type": q["type"],
+                     "valeur": affichage(q, r.donnees.get(q["code"])), "piece": pieces.get(q["code"])}
+            # Détection d'anomalies (F-32) : écart de plus de 50 % avec la réponse de l'année précédente.
+            v, ancien = r.donnees.get(q["code"]), precedente.donnees.get(q["code"]) if precedente else None
+            if q["type"] in TYPES_NUMERIQUES and not q.get("annee") and isinstance(ancien, (int, float)):
+                ligne["precedent"] = affichage(q, ancien)
+                if isinstance(v, (int, float)) and ancien:
+                    ecart = 100 * (v - ancien) / abs(ancien)
+                    ligne["ecart"] = round(ecart)
+                    ligne["anomalie"] = abs(ecart) > 50
+            lignes.append(ligne)
+        modules.append({"code": m["code"], "titre": m["titre"], "complet": m["code"] in r.modules_completes,
+                        "lignes": lignes})
     return reponse_resume(r) | {
         "campagne": campagne(r.campagne),
+        "commentaires": r.commentaires,
+        "exercice_precedent": precedente.campagne.exercice if precedente else None,
+        "export_url": reverse("api:reponse_export", args=[r.pk]),
         "modules": modules,
         "pieces": list(pieces.values()),
         "zip_url": reverse("api:pieces_zip", args=[r.pk]) if pieces else None,

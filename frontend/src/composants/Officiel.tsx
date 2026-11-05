@@ -3,15 +3,20 @@ import { useId } from "react";
 import { api } from "@/lib/api";
 import { cx } from "@/ui";
 
-export interface Config { pays: string; devise: string; ministere: string; institution: string; lien_public: string }
+export interface Config {
+  pays: string; devise: string; ministere: string; institution: string; lien_public: string; monnaie: string;
+  assistance: string; logo: string | null;
+}
 
 export function useConfig() {
   return useQuery({ queryKey: ["config"], queryFn: () => api.get<Config>("/api/config/"), staleTime: Infinity }).data;
 }
 
-/** Emblème neutre (écu tricolore) : à remplacer par les armoiries officielles fournies par l'institution. */
+/** Logo de l'institution (Paramètres) ou, à défaut, emblème neutre (écu tricolore). */
 export function Embleme({ className }: { className?: string }) {
   const ecu = `ecu-${useId().replace(/:/g, "")}`;
+  const config = useConfig();
+  if (config?.logo) return <img src={config.logo} alt="Logo de l'institution" className={cx("h-10 w-auto max-w-[96px] shrink-0 object-contain", className)} />;
   return (
     <svg viewBox="0 0 40 46" className={cx("h-10 w-9 shrink-0", className)} role="img" aria-label="Emblème">
       <defs>

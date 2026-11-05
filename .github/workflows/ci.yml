@@ -1,0 +1,74 @@
+# Intégration continue (section 8.3) : tests, construction de l'image, analyse des vulnérabilités.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  serveur:
+    name: Tests Django
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: enquete
+          POSTGRES_USER: enquete
+          POSTGRES_PASSWORD: enquete
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U enquete" --health-interval 5s --health-retries 10
+    env:
+      DJANGO_DEBUG: "1"
+      POSTGRES_HOST: localhost
+      POSTGRES_DB: enquete
+      POSTGRES_USER: enquete
+      POSTGRES_PASSWORD: enquete
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt coverage==7.6.10
+      - run: python manage.py check
+      - run: python manage.py makemigrations --check --dry-run
+      - name: Tests et couverture du code métier (objectif ≥ 70 %)
+        run: |
+          coverage run --source=enquete --omit="enquete/migrations/*,enquete/tests/*" manage.py test enquete
+          coverage report --fail-under=70
+
+  interface:
+    name: Interface React
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit -p .
+      - run: npm run build
+
+  image:
+    name: Image Docker et analyse Trivy
+    runs-on: ubuntu-latest
+    needs: [serveur, interface]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t enquete-epn/application:${{ github.sha }} .
+      - name: Analyse des vulnérabilités (Trivy)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.1 image \
+            --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --no-progress \
+            enquete-epn/application:${{ github.sha }}

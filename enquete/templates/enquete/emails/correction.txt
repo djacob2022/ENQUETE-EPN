@@ -1,0 +1,20 @@
+Madame, Monsieur,
+
+Après examen des réponses de {{ reponse.epn.nom }} à « {{ campagne.nom }} », la tutelle vous demande quelques corrections avant validation.
+{% if general %}
+Commentaire général :
+{{ general }}
+{% endif %}{% if remarques %}
+Questions concernées :
+{% for r in remarques %}- {{ r.code }} · {{ r.libelle }} : {{ r.texte }}
+{% endfor %}{% endif %}
+Pour corriger puis renvoyer vos réponses, ouvrez votre lien personnel :
+{{ reponse.lien }}
+
+Les commentaires s'affichent à côté de chaque question concernée.
+
+Cordialement,
+{{ institution }}{% if signature %}
+{{ signature }}{% endif %}{% if assistance %}
+
+Assistance : {{ assistance }}{% endif %}
