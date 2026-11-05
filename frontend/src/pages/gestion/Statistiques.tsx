@@ -10,7 +10,8 @@ import { EnTetePage, peut, SansCampagne, useGestion } from "./Gestion";
 import { MenuExport } from "./Reponses";
 import { COULEURS, InfoBulle } from "./TableauDeBord";
 
-const SERIES = ["rgb(var(--marque))", "rgb(var(--accent))", "rgb(var(--succes))", "rgb(var(--alerte))", "rgb(var(--danger))", "rgb(var(--institution))", "rgb(var(--discret))"];
+// Teintes nettement distinctes (vert, orange, bleu, violet, rouge, ocre, gris) : lisibles dans les deux thèmes.
+const SERIES = ["rgb(var(--marque))", "rgb(var(--accent))", "#3b82f6", "#8b5cf6", "rgb(var(--danger))", "rgb(var(--alerte))", "rgb(var(--discret))"];
 const BASES = { validees: "réponses validées", envoyees: "réponses envoyées", toutes: "réponses, brouillons compris", statut: "réponses du statut choisi" };
 
 function Evolution({ n, n1 }: { n?: number | null; n1?: number | null }) {
