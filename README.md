@@ -7,7 +7,7 @@ Application web de collecte d'informations auprès des Établissements Publics N
 | Couche | Technologies | Rôle |
 | --- | --- | --- |
 | Interface (`frontend/`) | React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, Recharts, Framer Motion | Formulaire des EPN, espace administrateur, thème clair/sombre, mobile |
-| API (`enquete/`, `config/`) | Python 3.12, Django 5 | API JSON, règles de validation et de cohérence, e-mails, exports Excel, pièces jointes |
+| API (`enquete/`, `config/`) | Python 3.12, Django 5.2 LTS | API JSON, règles de validation et de cohérence, e-mails, exports Excel, pièces jointes |
 | Données | PostgreSQL 16 | Établissements, campagnes, réponses, fichiers |
 
 L'interface appelle l'API sous `/api/` (même origine, session et jeton CSRF). En production, l'image Docker construit l'interface React, puis Django la sert avec ses fichiers statiques.
