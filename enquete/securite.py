@@ -139,3 +139,22 @@ class PolitiqueContenu:
         reponse.headers.setdefault("Content-Security-Policy", CSP)
         reponse.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         return reponse
+
+
+# --- Politique de mot de passe (F-01) ------------------------------------------------------------
+
+class ComplexiteMotDePasse:
+    """Au moins trois familles de caractères parmi : minuscules, majuscules, chiffres, symboles."""
+
+    def validate(self, password, user=None):
+        from django.core.exceptions import ValidationError
+
+        familles = [any(c.islower() for c in password), any(c.isupper() for c in password),
+                    any(c.isdigit() for c in password), any(not c.isalnum() for c in password)]
+        if sum(familles) < 3:
+            raise ValidationError(
+                "Le mot de passe doit mêler au moins trois types de caractères : minuscules, majuscules, chiffres, "
+                "symboles.", code="mot_de_passe_trop_simple")
+
+    def get_help_text(self):
+        return "Au moins trois types de caractères parmi minuscules, majuscules, chiffres et symboles."

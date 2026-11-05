@@ -1,11 +1,16 @@
 Madame, Monsieur,
 
-Sauf erreur de notre part, le questionnaire de {{ reponse.epn.nom }} pour « {{ campagne.nom }} » n'a pas encore été envoyé{% if reponse.statut == "en_cours" %} (avancement actuel : {{ reponse.avancement }} %){% endif %}.
+{% if texte_relance %}{{ texte_relance }}
 
-La date limite est fixée au {{ campagne.date_cloture|date:"j F Y" }}. Pour compléter et envoyer vos réponses :
+{% endif %}Sauf erreur de notre part, le questionnaire de {{ reponse.epn.nom }} pour « {{ campagne.nom }} » n'a pas encore été envoyé{% if reponse.statut == "en_cours" %} (avancement actuel : {{ reponse.avancement }} %){% endif %}.
+
+La date limite est fixée au {{ date_limite|date:"j F Y" }}. Pour compléter et envoyer vos réponses :
 {{ reponse.lien }}
 
 Si vous avez déjà envoyé vos réponses, merci de ne pas tenir compte de ce message.
 
 Cordialement,
-{{ institution }}
+{{ institution }}{% if signature %}
+{{ signature }}{% endif %}{% if assistance %}
+
+Assistance : {{ assistance }}{% endif %}

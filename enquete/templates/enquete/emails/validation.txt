@@ -1,0 +1,9 @@
+Madame, Monsieur,
+
+Les réponses de {{ reponse.epn.nom }} à « {{ campagne.nom }} » (exercice {{ campagne.exercice }}) ont été examinées et validées par la tutelle. Elles seront prises en compte dans les statistiques de la campagne.
+
+Merci pour votre contribution.
+
+Cordialement,
+{{ institution }}{% if signature %}
+{{ signature }}{% endif %}

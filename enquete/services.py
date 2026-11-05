@@ -1,4 +1,5 @@
 """Logique métier partagée par l'API : saisie du questionnaire, pièces jointes, soumission, filtres."""
+import json
 import zipfile
 from io import BytesIO
 
@@ -12,7 +13,7 @@ from .emails import envoyer_accuse
 from .forms import ModuleForm
 from .models import Campagne, PieceJointe, Reponse
 from .pieces import valider_piece
-from .questionnaire import MODULES
+from .questionnaire import condition_remplie
 
 
 class Refus(Exception):
@@ -24,17 +25,25 @@ class Refus(Exception):
         self.statut = statut
 
 
-def module_par_code(code):
-    for m in MODULES:
-        if m["code"] == code:
-            return m
-    raise Refus("Rubrique inconnue.", 404)
+def module_par_code(reponse, code):
+    m = reponse.campagne.q.module(code)
+    if m is None:
+        raise Refus("Rubrique inconnue.", 404)
+    return m
 
 
 def etat(reponse):
+    """« soumis » (transmise, verrouillée), « ferme » (hors délai) ou « ouvert » (saisie possible)."""
     if reponse.est_soumise:
         return "soumis"
-    if not reponse.campagne.active or not reponse.campagne.est_ouverte:
+    if not reponse.campagne.active:
+        return "ferme"
+    aujourd_hui = timezone.localdate()
+    if aujourd_hui < reponse.campagne.date_ouverture:
+        return "ferme"
+    # Délai : la date de clôture, ou la prolongation accordée à cet EPN (F-20). Une réponse renvoyée pour
+    # correction reste modifiable tant que la campagne est active.
+    if aujourd_hui > reponse.date_limite_effective and reponse.statut != Reponse.Statut.A_CORRIGER:
         return "ferme"
     return "ouvert"
 
@@ -65,7 +74,9 @@ def _vers_querydict(valeurs):
     """Les valeurs JSON du navigateur, sous la forme attendue par les formulaires Django."""
     qd = QueryDict(mutable=True)
     for code, v in (valeurs or {}).items():
-        if isinstance(v, list):
+        if isinstance(v, list) and v and isinstance(v[0], dict):
+            qd[code] = json.dumps(v)  # tableau à lignes répétables
+        elif isinstance(v, list):
             qd.setlist(code, [str(x) for x in v])
         elif v is None or isinstance(v, bool):
             qd[code] = ""
@@ -78,39 +89,58 @@ def _pieces(reponse):
     return {p.code: p for p in reponse.pieces.all()}
 
 
+def _formulaire_complet(reponse, mod, pieces):
+    q = reponse.campagne.q
+    valeurs = {x["code"]: reponse.donnees.get(x["code"]) for x in mod["questions"] if x["type"] != "fichier"}
+    return ModuleForm(mod, _vers_querydict(valeurs), pieces=pieces, regles=q.regles_du_module(mod["code"]),
+                      contexte=reponse.donnees)
+
+
+def recalculer_completude(reponse, pieces=None):
+    """Recalcule la liste des rubriques complètes (une réponse peut en changer une autre via les conditions)."""
+    pieces = _pieces(reponse) if pieces is None else pieces
+    completes = [m["code"] for m in reponse.campagne.q.modules if _formulaire_complet(reponse, m, pieces).is_valid()]
+    reponse.modules_completes = completes
+    return completes
+
+
+def _effacer_masquees(reponse):
+    """Une question devenue sans objet (condition non remplie) perd sa réponse : pas de donnée fantôme."""
+    for _, q in reponse.campagne.q.questions():
+        if q["type"] != "fichier" and not condition_remplie(q, reponse.donnees) and reponse.donnees.get(q["code"]) not in (None, "", []):
+            reponse.donnees[q["code"]] = None
+
+
 def enregistrer_module(reponse, code, valeurs, valider):
     """Enregistre une rubrique et renvoie les erreurs à afficher (vide si tout va bien).
 
     Les valeurs correctes sont toujours gardées (brouillon), même si la rubrique contient des erreurs :
     rien de ce que la personne a saisi n'est perdu. La rubrique n'est « complète » que si elle passe la
-    validation entière (champs obligatoires et règles de cohérence).
+    validation entière (champs obligatoires, conditions d'affichage et règles de cohérence).
     """
-    mod = module_par_code(code)
+    mod = module_par_code(reponse, code)
     envoyees = {q["code"] for q in mod["questions"] if q["type"] != "fichier" and q["code"] in valeurs}
     donnees = _vers_querydict({c: valeurs[c] for c in envoyees})
     pieces = _pieces(reponse)
 
-    brouillon = ModuleForm(mod, donnees, brouillon=True, pieces=pieces)
+    brouillon = ModuleForm(mod, donnees, brouillon=True, pieces=pieces, contexte=reponse.donnees | dict(valeurs))
     brouillon.is_valid()  # cleaned_data ne contient que les champs au bon format
     reponse.donnees.update({c: v for c, v in brouillon.valeurs_json().items() if c in envoyees})
+    _effacer_masquees(reponse)
 
-    complet_form = ModuleForm(mod, _vers_querydict(
-        {q["code"]: reponse.donnees.get(q["code"]) for q in mod["questions"] if q["type"] != "fichier"}),
-        pieces=pieces)
-    complet = complet_form.is_valid()
-    if complet and code not in reponse.modules_completes:
-        reponse.modules_completes.append(code)
-    elif not complet and code in reponse.modules_completes:
-        reponse.modules_completes.remove(code)
+    complet_form = _formulaire_complet(reponse, mod, pieces)
+    complet_form.is_valid()
+    recalculer_completude(reponse, pieces)
     reponse.save()
 
-    erreurs = complet_form.errors if valider else brouillon.errors
-    return {c: [str(e) for e in liste] for c, liste in erreurs.items()}
+    # À la validation : champs manquants et règles de cohérence, plus les erreurs de format de la saisie en cours.
+    erreurs = (complet_form.errors | brouillon.errors) if valider else brouillon.errors
+    return {c: [str(e) for e in liste] for c, liste in erreurs.items() if c != "__all__"}
 
 
 def deposer_piece(reponse, code, fichier):
-    q = next((q for m in MODULES for q in m["questions"] if q["code"] == code and q["type"] == "fichier"), None)
-    if q is None:
+    q = reponse.campagne.q.question(code)
+    if q is None or q["type"] != "fichier":
         raise Refus("Cette question n'accepte pas de fichier.", 404)
     from django.core.exceptions import ValidationError
 
@@ -126,7 +156,8 @@ def deposer_piece(reponse, code, fichier):
             ancienne.supprimer()
         nouvelle.save()
     reponse.donnees[code] = nouvelle.nom_original
-    reponse.save(update_fields=["donnees", "date_modification"])
+    recalculer_completude(reponse)
+    reponse.save()
     return nouvelle
 
 
@@ -136,16 +167,15 @@ def supprimer_piece(reponse, code):
         raise Refus("Aucun fichier pour cette question.", 404)
     piece.supprimer()
     reponse.donnees.pop(code, None)
-    mod = next(m for m in MODULES if any(q["code"] == code for q in m["questions"]))
-    q = next(q for q in mod["questions"] if q["code"] == code)
-    if q.get("obligatoire", True) and mod["code"] in reponse.modules_completes:
-        reponse.modules_completes.remove(mod["code"])
+    recalculer_completude(reponse)
     reponse.save()
 
 
 def soumettre(reponse, certification):
-    manquants = [m["titre"] for m in MODULES if m["code"] not in reponse.modules_completes]
+    recalculer_completude(reponse)
+    manquants = [m["titre"] for m in reponse.campagne.q.modules if m["code"] not in reponse.modules_completes]
     if manquants:
+        reponse.save(update_fields=["modules_completes"])
         raise Refus("Rubriques à compléter avant l'envoi : " + ", ".join(manquants) + ".")
     if not certification:
         raise Refus("Cochez la case de certification pour envoyer.")
@@ -158,6 +188,96 @@ def soumettre(reponse, certification):
         reponse.save(update_fields=["statut", "date_soumission", "date_modification"])
     envoyer_accuse(reponse)
     return reponse
+
+
+def reponse_precedente(reponse):
+    """La réponse du même EPN à la campagne précédente (F-24, F-32, F-40)."""
+    return (Reponse.objects.filter(epn=reponse.epn, campagne__exercice__lt=reponse.campagne.exercice)
+            .exclude(donnees={}).order_by("-campagne__exercice").select_related("campagne").first())
+
+
+def preremplir(reponse, code_module):
+    """Reprend, pour une rubrique, les réponses de la campagne précédente (questions de même code, hors fichiers)."""
+    precedente = reponse_precedente(reponse)
+    if precedente is None:
+        raise Refus("Aucune réponse de votre établissement à une campagne précédente.", 404)
+    mod = module_par_code(reponse, code_module)
+    repris = 0
+    for q in mod["questions"]:
+        v = precedente.donnees.get(q["code"])
+        if q["type"] != "fichier" and v not in (None, "", []):
+            reponse.donnees[q["code"]] = v
+            repris += 1
+    _effacer_masquees(reponse)
+    recalculer_completude(reponse)
+    reponse.save()
+    return repris, precedente.campagne
+
+
+# --- Circuit de validation (F-29, F-30, F-20) ------------------------------------------------------
+
+def prendre_en_revue(reponse, par):
+    if reponse.statut != Reponse.Statut.SOUMIS:
+        raise Refus("Seule une réponse soumise peut être prise en revue.")
+    reponse.statut = Reponse.Statut.EN_REVUE
+    reponse.save(update_fields=["statut", "date_modification"])
+
+
+def valider(reponse, par):
+    if reponse.statut not in (Reponse.Statut.SOUMIS, Reponse.Statut.EN_REVUE):
+        raise Refus("Seule une réponse soumise ou en revue peut être validée.")
+    reponse.statut = Reponse.Statut.VALIDE
+    reponse.date_validation = timezone.now()
+    reponse.valide_par = par
+    reponse.commentaires = {}
+    reponse.save(update_fields=["statut", "date_validation", "valide_par", "commentaires", "date_modification"])
+
+
+def renvoyer_pour_correction(reponse, commentaires, par):
+    """Renvoie la réponse à l'EPN avec un commentaire général et/ou par question ; il corrige puis renvoie."""
+    if not reponse.est_soumise:
+        raise Refus("Cette réponse n'a pas été envoyée.")
+    q = reponse.campagne.q
+    propres = {}
+    for code, texte in (commentaires or {}).items():
+        texte = str(texte or "").strip()[:2000]
+        if texte and (code == "general" or q.question(code)):
+            propres[code] = texte
+    if not propres:
+        raise Refus("Écrivez au moins un commentaire pour expliquer la correction attendue.")
+    reponse.statut = Reponse.Statut.A_CORRIGER
+    reponse.commentaires = propres
+    reponse.date_soumission = None
+    reponse.date_validation = None
+    reponse.valide_par = ""
+    reponse.save()
+    return propres
+
+
+def rouvrir(reponse):
+    if not reponse.est_soumise:
+        raise Refus("Cette réponse n'est pas envoyée.")
+    reponse.statut = Reponse.Statut.EN_COURS
+    reponse.date_soumission = None
+    reponse.date_validation = None
+    reponse.valide_par = ""
+    reponse.save(update_fields=["statut", "date_soumission", "date_validation", "valide_par", "date_modification"])
+
+
+def prolonger(reponse, texte_date):
+    import datetime
+
+    if not texte_date:
+        reponse.date_limite = None
+    else:
+        try:
+            jour = datetime.date.fromisoformat(str(texte_date))
+        except ValueError:
+            raise Refus("Date invalide.")
+        if jour <= reponse.campagne.date_cloture:
+            raise Refus("Le nouveau délai doit être postérieur à la clôture de la campagne.")
+        reponse.date_limite = jour
+    reponse.save(update_fields=["date_limite", "date_modification"])
 
 
 # --- Espace administrateur -------------------------------------------------------------------------
@@ -193,7 +313,7 @@ def historique(tutelles=None):
     lignes = []
     for c in Campagne.objects.order_by("exercice").annotate(
         total=Count("reponses", filter=dans),
-        soumis=Count("reponses", filter=dans & Q(reponses__statut=Reponse.Statut.SOUMIS)),
+        soumis=Count("reponses", filter=dans & Q(reponses__statut__in=Reponse.ENVOYES)),
     ).filter(total__gt=0):
         lignes.append({"libelle": str(c.exercice), "taux": round(100 * c.soumis / c.total) if c.total else 0})
     return lignes

@@ -1,0 +1,13 @@
+Bonjour{% if user.first_name %} {{ user.first_name }}{% endif %},
+
+{% if nouveau_compte %}Un compte a été créé pour vous sur l'espace de gestion de l'enquête sur les Établissements Publics Nationaux (identifiant : {{ user.get_username }}).
+
+Pour l'activer, choisissez votre mot de passe en ouvrant ce lien :{% else %}Une réinitialisation de votre mot de passe a été demandée pour l'espace de gestion de l'enquête (identifiant : {{ user.get_username }}).
+
+Pour choisir un nouveau mot de passe, ouvrez ce lien :{% endif %}
+{{ lien }}
+
+Ce lien est valable 24 heures et ne sert qu'une fois.{% if not nouveau_compte %} Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe actuel reste valable.{% endif %}
+
+Cordialement,
+{{ institution }}

@@ -111,10 +111,20 @@ TAILLE_MAX_REQUETE = 12 * 1024 * 1024
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 10}},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    {"NAME": "enquete.securite.ComplexiteMotDePasse"},
 ]
+
+# Mots de passe hachés avec Argon2 (section 7) ; les anciens hachages PBKDF2 restent lisibles et sont convertis.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
+
+# Lien de réinitialisation du mot de passe valable 24 heures (F-02).
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
 
 LANGUAGE_CODE = "fr-fr"
 TIME_ZONE = os.environ.get("TIME_ZONE", "Africa/Abidjan")
@@ -143,7 +153,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # CSRF : le jeton est lu dans le cookie par l'interface React et renvoyé dans l'en-tête X-CSRFToken.
 CSRF_COOKIE_HTTPONLY = False
-SESSION_COOKIE_AGE = 60 * 60 * 8
+# Expiration après 30 minutes d'inactivité (F-06) : chaque requête repousse l'échéance.
+SESSION_COOKIE_AGE = int(os.environ.get("SESSION_MINUTES", "30")) * 60
+SESSION_SAVE_EVERY_REQUEST = True
 
 # E-mails : SMTP configurable ; en développement, Mailpit (voir docker-compose.yml).
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")

@@ -7,9 +7,12 @@ Voici le lien personnel de votre établissement :
 
 Il ouvre directement le questionnaire. Vos réponses sont enregistrées au fur et à mesure : vous pouvez reprendre plus tard avec ce même lien.
 
-Date limite d'envoi : {{ campagne.date_cloture|date:"j F Y" }}.
+Date limite d'envoi : {{ date_limite|date:"j F Y" }}.
 
 Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : sans ce lien, personne ne peut répondre au nom de votre établissement.
 
 Cordialement,
-{{ institution }}
+{{ institution }}{% if signature %}
+{{ signature }}{% endif %}{% if assistance %}
+
+Assistance : {{ assistance }}{% endif %}

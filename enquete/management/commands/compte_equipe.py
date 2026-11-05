@@ -16,13 +16,17 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("identifiant")
         parser.add_argument("--tutelle", action="append", default=[], help="Tutelle visible (répétable).")
+        parser.add_argument("--role", default="administrateur", choices=ProfilEquipe.Role.values,
+                            help="administrateur, superviseur, analyste ou lecteur.")
         parser.add_argument("--email", default="")
         parser.add_argument("--nom", default="", help="Prénom et nom affichés.")
         parser.add_argument("--mot-de-passe", dest="mot_de_passe", default=None,
                             help="À éviter en production (reste dans l'historique du terminal) : sans cette option, "
                                  "le mot de passe est demandé.")
 
-    def handle(self, identifiant, tutelle, email, nom, mot_de_passe, **options):
+    def handle(self, identifiant, tutelle, role, email, nom, mot_de_passe, **options):
+        if role == "superviseur" and not tutelle:
+            raise CommandError("Un superviseur de tutelle doit avoir au moins une --tutelle.")
         Utilisateur = get_user_model()
         utilisateur, cree = Utilisateur.objects.get_or_create(username=identifiant)
         if cree or mot_de_passe is not None:
@@ -40,6 +44,6 @@ class Command(BaseCommand):
         if nom:
             utilisateur.first_name, _, utilisateur.last_name = nom.partition(" ")
         utilisateur.save()
-        ProfilEquipe.objects.update_or_create(utilisateur=utilisateur, defaults={"tutelles": ", ".join(tutelle)})
+        ProfilEquipe.objects.update_or_create(utilisateur=utilisateur, defaults={"tutelles": ", ".join(tutelle), "role": role})
         portee = ", ".join(tutelle) if tutelle else "tous les établissements"
-        self.stdout.write(self.style.SUCCESS(f"Compte « {identifiant} » {'créé' if cree else 'mis à jour'} : {portee}."))
+        self.stdout.write(self.style.SUCCESS(f"Compte « {identifiant} » {'créé' if cree else 'mis à jour'} ({role}) : {portee}."))

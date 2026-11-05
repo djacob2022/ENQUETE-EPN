@@ -8,4 +8,7 @@ Vous pouvez consulter le récapitulatif ici :
 Merci pour votre contribution.
 
 Cordialement,
-{{ institution }}
+{{ institution }}{% if signature %}
+{{ signature }}{% endif %}{% if assistance %}
+
+Assistance : {{ assistance }}{% endif %}
