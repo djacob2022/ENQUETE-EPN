@@ -9,7 +9,7 @@ import { date } from "@/lib/format";
 import { ReponsePublique } from "@/lib/types";
 import { Badge, Bouton, Carte, cx, useToast } from "@/ui";
 import { urlApi, useFormulaire } from "./Formulaire";
-import { lisible } from "./Questions";
+import { estPosee, lisible } from "./Questions";
 
 function Synthese({ modifiable }: { modifiable: boolean }) {
   const { reponse, questionnaire, jeton } = useFormulaire();
@@ -26,12 +26,15 @@ function Synthese({ modifiable }: { modifiable: boolean }) {
               {modifiable && <Link to={`/r/${jeton}/${m.code}`} className="pas-imprimer inline-flex items-center gap-1 text-sm font-medium text-marque hover:underline"><PenLine className="h-3.5 w-3.5" /> Modifier</Link>}
             </div>
             <dl className="divide-y divide-trait">
-              {m.questions.map((q) => {
+              {m.questions.filter((q) => estPosee(q, reponse.donnees)).map((q) => {
                 const piece = reponse.pieces[q.code];
                 const v = q.type === "fichier" ? piece?.nom ?? "" : lisible(q, reponse.donnees[q.code]);
                 return (
-                  <div key={q.code} className="grid gap-1 px-6 py-3 sm:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] sm:gap-6">
-                    <dt className="text-sm text-discret">{q.libelle}</dt>
+                  <div key={q.code} className={cx("grid gap-1 px-6 py-3 sm:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] sm:gap-6",
+                    modifiable && reponse.commentaires?.[q.code] && "bg-danger-doux/50")}>
+                    <dt className="text-sm text-discret">{q.libelle}
+                      {modifiable && reponse.commentaires?.[q.code] && <span className="mt-1 block text-xs font-medium text-danger">Correction demandée : {reponse.commentaires[q.code]}</span>}
+                    </dt>
                     <dd className={cx("text-sm font-medium", !v && "font-normal text-discret/70")}>
                       {q.type === "fichier" && piece
                         ? <a href={piece.url} className="inline-flex items-center gap-1.5 text-marque hover:underline"><FileText className="h-3.5 w-3.5" />{v}</a>

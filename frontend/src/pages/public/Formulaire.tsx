@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Check, CloudOff, Link2Off, Loader2, Lock, Send, UserRound } from "lucide-react";
+import { Check, CloudOff, Link2Off, Loader2, Lock, MessageSquareWarning, Send, UserRound } from "lucide-react";
 import { createContext, useContext, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import BoutonTheme from "@/composants/BoutonTheme";
@@ -40,7 +40,12 @@ export default function Formulaire() {
   const client = useQueryClient();
   const [sauvegarde, setSauvegarde] = useState<EtatSauvegarde>("repos");
   const rq = useQuery({ queryKey: ["reponse", jeton], queryFn: () => api.get<ReponsePublique>(urlApi(jeton)) });
-  const qq = useQuery({ queryKey: ["questionnaire"], queryFn: () => api.get<Questionnaire>("/api/questionnaire/"), staleTime: Infinity });
+  const idCampagne = rq.data?.campagne.id;
+  const qq = useQuery({
+    queryKey: ["questionnaire", idCampagne],
+    queryFn: () => api.get<Questionnaire>(`/api/questionnaire/?campagne=${idCampagne}`),
+    enabled: !!idCampagne, staleTime: 5 * 60_000,
+  });
 
   const contexte = useMemo<Contexte | null>(() => rq.data && qq.data ? {
     jeton, reponse: rq.data, questionnaire: qq.data, sauvegarde, setSauvegarde,
@@ -63,7 +68,7 @@ export default function Formulaire() {
   if (reponse.etat === "ferme") {
     return (
       <PageSimple icone={<Lock />} titre="La saisie n'est pas ouverte"
-        texte={`La campagne « ${reponse.campagne.nom} » est ouverte du ${date(reponse.campagne.date_ouverture)} au ${date(reponse.campagne.date_cloture)}. Pour un délai supplémentaire, contactez l'administration de tutelle.`} />
+        texte={`La campagne « ${reponse.campagne.nom} » est ouverte du ${date(reponse.campagne.date_ouverture)} au ${date(reponse.date_limite)}. Pour un délai supplémentaire, contactez l'administration de tutelle.`} />
     );
   }
 
@@ -94,7 +99,8 @@ function Cadre({ children }: { children: React.ReactNode }) {
   const { reponse, questionnaire, jeton } = useFormulaire();
   const { pathname } = useLocation();
   const courant = pathname.split("/").filter(Boolean)[2] ?? "";
-  const jours = joursRestants(reponse.campagne.date_cloture);
+  const jours = joursRestants(reponse.date_limite);
+  const nbCommentaires = Object.keys(reponse.commentaires ?? {}).length;
   const base = `/r/${jeton}`;
   const config = useConfig();
 
@@ -116,6 +122,17 @@ function Cadre({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
+      {nbCommentaires > 0 && (
+        <div className="border-b border-danger/20 bg-danger-doux">
+          <div className="mx-auto flex max-w-7xl items-start gap-3 px-4 py-3 text-sm sm:px-6">
+            <MessageSquareWarning className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
+            <p><strong className="text-danger">Votre réponse vous a été renvoyée pour correction.</strong>{" "}
+              {reponse.commentaires.general ? `« ${reponse.commentaires.general} » ` : ""}
+              Corrigez les points signalés, puis renvoyez vos réponses depuis « Vérification et envoi ».</p>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto flex max-w-7xl gap-10 px-4 py-8 sm:px-6 lg:py-12">
         <aside className="sticky top-28 hidden h-fit w-72 shrink-0 lg:block">
           <div className="flex items-center gap-4 rounded-2xl border border-trait bg-surface p-5 shadow-carte">
@@ -136,7 +153,8 @@ function Cadre({ children }: { children: React.ReactNode }) {
                 Vos coordonnées
               </Etape>
               {questionnaire.modules.map((m, i) => (
-                <Etape key={m.code} to={`${base}/${m.code}`} actif={courant === m.code} fait={reponse.modules_completes.includes(m.code)} numero={i + 1}>
+                <Etape key={m.code} to={`${base}/${m.code}`} actif={courant === m.code} fait={reponse.modules_completes.includes(m.code)} numero={i + 1}
+                  alerte={m.questions.some((q) => reponse.commentaires?.[q.code])}>
                   {m.titre}
                 </Etape>
               ))}
@@ -153,7 +171,7 @@ function Cadre({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Etape({ to, actif, fait, numero, children }: { to: string; actif: boolean; fait: boolean; numero: React.ReactNode; children: React.ReactNode }) {
+function Etape({ to, actif, fait, numero, children, alerte = false }: { to: string; actif: boolean; fait: boolean; numero: React.ReactNode; children: React.ReactNode; alerte?: boolean }) {
   return (
     <li className="relative">
       <Link to={to} aria-current={actif ? "step" : undefined}
@@ -165,6 +183,7 @@ function Etape({ to, actif, fait, numero, children }: { to: string; actif: boole
           {fait && !actif ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : numero}
         </span>
         <span className="truncate">{children}</span>
+        {alerte && <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-danger" aria-label="Correction demandée" />}
       </Link>
     </li>
   );

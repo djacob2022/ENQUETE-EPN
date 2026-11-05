@@ -17,16 +17,29 @@ L'interface appelle l'API sous `/api/` (même origine, session et jeton CSRF). E
 **Le lien à diffuser à toutes les entités : `https://<votre-domaine>/formulaire`** (en local : http://localhost:8000/formulaire).
 C'est le même lien pour tous. L'entité y choisit son établissement ; son lien personnel est alors envoyé à l'adresse e-mail officielle de son point focal (enregistrée dans le répertoire). Personne ne peut donc répondre à la place d'un autre établissement.
 
-1. **L'administrateur** importe la liste des EPN (fichier Excel), crée une campagne, puis envoie les **invitations** : chaque EPN reçoit par e-mail un **lien personnel**.
-2. **La personne qui reçoit le lien** clique dessus, saisit ses **nom, prénom, e-mail et téléphone**, clique sur **Suivant**, puis répond aux questions rubrique par rubrique. Les réponses sont enregistrées à chaque étape : elle peut reprendre plus tard avec le même lien. Elle relit un récapitulatif, certifie, puis clique sur **Envoyer**. Un accusé de réception est envoyé par e-mail.
-3. **L'espace administrateur** (`/gestion/`) permet de :
-   - suivre l'avancement (tableau de bord, taux de réponse par tutelle) ;
-   - consulter chaque réponse, télécharger ses pièces jointes (une par une ou en ZIP) et la rouvrir pour correction ;
-   - **relancer les retardataires** par e-mail, un par un ou tous ensemble ;
-   - **exporter en Excel** (feuilles Réponses, Dictionnaire, Statistiques, Indicateurs avec graphique) ;
-   - afficher les **statistiques et graphiques** (moyenne, médiane, écart-type, fréquences, indicateurs financiers et RH).
+1. **L'administrateur** importe la liste des EPN (fichier Excel), crée une campagne (EPN ciblés, relances automatiques J-7, J-2, J+1), ajuste le questionnaire dans l'**éditeur sans code**, puis envoie les **invitations** : chaque EPN reçoit par e-mail un **lien personnel**.
+2. **La personne qui reçoit le lien** saisit ses **nom, prénom, e-mail et téléphone**, puis répond rubrique par rubrique (enregistrement automatique, contrôles en direct, questions conditionnelles, reprise des réponses de l'an dernier). Elle relit, certifie, puis envoie. Un accusé de réception part par e-mail.
+3. **La tutelle** examine la réponse : elle la **valide** ou la **renvoie pour correction** avec un commentaire par question. L'EPN corrige et renvoie (circuit brouillon → soumis → en revue → à corriger → validé).
+4. **L'espace de gestion** (`/gestion/`) permet aussi de :
+   - suivre l'avancement (taux de réponse par tutelle, catégorie, région ; retardataires ; réponses à examiner) ;
+   - relancer, prolonger le délai d'un EPN, remplacer un lien compromis ;
+   - **exporter** en Excel (consolidé avec dictionnaire, ou une feuille par module pour un EPN) et en CSV ;
+   - produire les **statistiques** (quartiles, histogrammes, fréquences, tableaux croisés, comparaison N-1 / N) sur les réponses **validées** par défaut ;
+   - gérer les **comptes et rôles**, consulter le **journal d'audit**, régler les **paramètres** (logo, identité, textes des e-mails).
 
-Le questionnaire (9 rubriques, 48 questions, dont 5 pièces justificatives) est défini dans `enquete/questionnaire.py`. Sa version imprimable est disponible dans l'espace administrateur, menu **Questionnaire**.
+Le questionnaire de départ (10 rubriques A à J, 68 questions, section 4 du cahier des charges) est défini dans `enquete/questionnaire.py` ; chaque campagne en garde ensuite sa propre version, modifiable dans le menu **Questionnaire**.
+
+### Rôles
+
+| Rôle | Droits |
+| --- | --- |
+| Super-administrateur (`is_superuser`) | Tout, y compris les comptes des autres super-administrateurs |
+| Administrateur d'enquête | Campagnes, questionnaire, répertoire, comptes, journal, paramètres, validation |
+| Superviseur de tutelle | Réponses des EPN de sa tutelle : validation, renvoi pour correction, relances, liens |
+| Analyste | Consultation de tous les résultats et exports, sans modification |
+| Lecteur | Tableaux de bord et statistiques agrégés, sans données nominatives |
+
+La correspondance exigence par exigence avec le cahier des charges est dans [`docs/CONFORMITE.md`](docs/CONFORMITE.md).
 
 ## Installer et tester sur votre ordinateur
 
@@ -37,7 +50,6 @@ Le questionnaire (9 rubriques, 48 questions, dont 5 pièces justificatives) est 
    ```bash
    git clone https://github.com/djacob2022/ENQUETE-EPN.git
    cd ENQUETE-EPN
-   git checkout claude/tender-cannon-9lvbtv
    ```
 
 2. Lancer l'application :
@@ -131,17 +143,21 @@ npm install
 npm run dev                          # interface sur http://localhost:5173 (relaie /api vers :8000)
 ```
 
-Tests de l'API : `DJANGO_DEBUG=1 python manage.py test enquete`. Vérification des types de l'interface : `cd frontend && npm run typecheck`.
+Tests de l'API : `DJANGO_DEBUG=1 python manage.py test enquete` (70 tests, couverture du code métier 86 %). L'intégration continue (`.github/workflows/ci.yml`) les rejoue sur PostgreSQL, construit l'interface et l'image Docker, et analyse l'image avec Trivy. Vérification des types de l'interface : `cd frontend && npm run typecheck`.
 
 ## Comptes de l'équipe et périmètre
 
-Un compte peut être limité aux établissements d'une ou plusieurs tutelles : il ne voit, n'exporte et ne relance que ceux-là. Un compte sans limite (administrateur d'enquête) voit tout, et lui seul crée les campagnes et importe les EPN.
+Les comptes se créent dans **Comptes et rôles** : la personne reçoit un lien pour choisir son mot de passe (12 caractères, trois types de caractères), puis se connecte avec son adresse e-mail. « Mot de passe oublié ? » envoie un lien de réinitialisation. La session se ferme après 30 minutes d'inactivité.
+
+Un compte peut être limité aux établissements d'une ou plusieurs tutelles : il ne voit, n'exporte et ne relance que ceux-là. En ligne de commande :
 
 ```bash
-docker compose exec web python manage.py compte_equipe f.kone --nom "Fatou Koné" --tutelle "Santé" --tutelle "Éducation"
+docker compose exec web python manage.py compte_equipe f.kone --role superviseur --nom "Fatou Koné" --tutelle "Santé" --tutelle "Éducation"
 ```
 
-Le mot de passe est demandé à l'écran. Le périmètre se modifie aussi dans `/django-admin/`, sur la fiche de l'utilisateur.
+## Relances automatiques
+
+Le service `taches` de `docker-compose.yml` vérifie toutes les heures les relances prévues par chaque campagne (champ « Relances automatiques », par défaut `-7,-2,1` : J-7, J-2 et J+1 par rapport à la clôture, ou au délai propre à l'EPN). Un EPN reçoit au plus une relance automatique par jour prévu. Hors Docker : `python manage.py taches` dans une tâche cron horaire.
 
 ## Lien compromis
 
@@ -149,9 +165,11 @@ Si le lien d'un établissement a été transmis à une mauvaise personne, ouvrez
 
 ## Importer les EPN
 
-Menu **Répertoire des EPN** → fichier `.xlsx` avec, dans cet ordre : Dénomination, Sigle, Catégorie (EPA/EPIC/AUTRE), Tutelle, Région, E-mail du point focal. La première ligne contient les en-têtes.
+Menu **Répertoire des EPN** → fichier `.xlsx` avec, dans cet ordre : Dénomination, Sigle, Catégorie (EPA/EPIC/AUTRE), Tutelle, Région, E-mail du point focal, Secteur (facultatif), Statut (Actif, En liquidation, Dissous ; facultatif). La première ligne contient les en-têtes. Chaque fiche se modifie aussi à l'écran ; l'historique des modifications y est affiché.
 
 ## Documents
 
 - `docs/Cahier_des_charges_ENQUETE-EPN.docx` : cahier des charges.
+- `docs/CONFORMITE.md` : matrice de conformité au cahier des charges (F-01 à F-50, sections 3, 4, 7 et 8).
 - `docs/MISE_EN_LIGNE.md` : mise en ligne sur un serveur.
+- Aide en ligne et FAQ pour les établissements et l'équipe : page `/aide` de l'application.

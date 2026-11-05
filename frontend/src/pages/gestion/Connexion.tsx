@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowRight, BarChart3, FileSpreadsheet, MailCheck } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import BoutonTheme from "@/composants/BoutonTheme";
 import { Embleme, useConfig } from "@/composants/Officiel";
 import { api, ErreurApi } from "@/lib/api";
@@ -11,7 +11,7 @@ import { Bouton, Champ, Logo } from "@/ui";
 
 export default function Connexion() {
   const naviguer = useNavigate();
-  const { state } = useLocation() as { state?: { depuis?: string } };
+  const { state } = useLocation() as { state?: { depuis?: string; message?: string } };
   const client = useQueryClient();
   const [identifiant, setIdentifiant] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
@@ -56,7 +56,7 @@ export default function Connexion() {
             ))}
           </div>
         </div>
-        <p className="relative text-xs text-white/40">Accès réservé aux agents habilités · toutes les actions sont journalisées.</p>
+        <p className="relative text-xs text-white/40">Accès réservé aux agents habilités · toutes les actions sont journalisées · session fermée après 30 minutes d'inactivité.</p>
       </section>
 
       <section className="relative flex flex-col px-6 py-6 sm:px-12">
@@ -67,12 +67,17 @@ export default function Connexion() {
               <h2 className="text-2xl font-semibold tracking-tight">Espace administration</h2>
               <p className="mt-1.5 text-sm text-discret">Les établissements n'ont pas de compte : ils répondent avec le lien reçu par e-mail.</p>
             </div>
+            {state?.message && !erreur && <div role="status" className="rounded-xl border border-succes/30 bg-succes-doux px-4 py-3 text-sm font-medium text-succes">{state.message}</div>}
             {erreur && <div role="alert" className="rounded-xl border border-danger/30 bg-danger-doux px-4 py-3 text-sm font-medium text-danger">{erreur}</div>}
-            <Champ libelle="Identifiant" autoComplete="username" autoFocus value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} />
+            <Champ libelle="Adresse e-mail ou identifiant" autoComplete="username" autoFocus value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} />
             <Champ libelle="Mot de passe" type="password" autoComplete="current-password" value={motDePasse} onChange={(e) => setMotDePasse(e.target.value)} />
             <Bouton type="submit" variante="primaire" taille="lg" className="w-full" chargement={envoi} disabled={!identifiant || !motDePasse}>
               Se connecter <ArrowRight className="h-4 w-4" />
             </Bouton>
+            <div className="flex justify-between text-sm">
+              <Link to="/mot-de-passe-oublie" className="font-medium text-marque hover:underline">Mot de passe oublié ?</Link>
+              <a href="/aide" className="text-discret hover:text-encre">Aide</a>
+            </div>
           </motion.form>
         </div>
       </section>

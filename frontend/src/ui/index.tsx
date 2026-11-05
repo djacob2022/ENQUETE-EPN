@@ -146,11 +146,16 @@ export function EnTeteCarte({ titre, sous, actions }: { titre: ReactNode; sous?:
 }
 
 const couleursStatut: Record<Statut, string> = {
-  soumis: "bg-succes-doux text-succes ring-succes/20",
+  valide: "bg-succes-doux text-succes ring-succes/20",
+  soumis: "bg-marque-doux text-marque ring-marque/20",
+  en_revue: "bg-accent-doux text-accent-fonce ring-accent/20",
+  a_corriger: "bg-danger-doux text-danger ring-danger/20",
   en_cours: "bg-alerte-doux text-alerte ring-alerte/20",
   invite: "bg-relief text-discret ring-trait",
 };
-const libellesStatut: Record<Statut, string> = { soumis: "Envoyé", en_cours: "En cours", invite: "Non commencé" };
+export const libellesStatut: Record<Statut, string> = {
+  valide: "Validé", soumis: "Soumis", en_revue: "En revue", a_corriger: "À corriger", en_cours: "Brouillon", invite: "Non commencé",
+};
 
 export function BadgeStatut({ statut }: { statut: Statut }) {
   return (

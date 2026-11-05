@@ -1,15 +1,35 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Download, FileText, RefreshCw, Trash2, UploadCloud } from "lucide-react";
+import { Check, Download, FileText, MessageSquareWarning, Plus, RefreshCw, Trash2, UploadCloud, X } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { api, envoyerFichier, ErreurApi } from "@/lib/api";
 import { compacte, date, nombre, taille } from "@/lib/format";
-import { Module, Piece, Question, ReponsePublique, Valeur } from "@/lib/types";
+import { LigneTableau, Module, Piece, Question, ReponsePublique, Valeur } from "@/lib/types";
 import { Bouton, cx, Etiquette, MessageChamp, useToast } from "@/ui";
 import { urlApi, useFormulaire } from "./Formulaire";
 
 /* ---------- Conversion des saisies ---------- */
 
 const numerique = (t: string) => ["entier", "montant", "pourcentage"].includes(t);
+const nettoyerNombre = (v: string) => v.replace(/[\s\u00a0\u202f]/g, "").replace(",", ".");
+
+/** Vrai si la question est posée, compte tenu des réponses déjà données (condition d'affichage). */
+export function estPosee(q: Question, valeurs: Record<string, Valeur>) {
+  if (!q.si) return true;
+  const v = valeurs[q.si.question];
+  if (Array.isArray(v)) return v.some((x) => typeof x === "string" && q.si!.valeurs.includes(x));
+  return typeof v === "string" && q.si.valeurs.includes(v);
+}
+
+/** Commentaire de la tutelle sur une question à corriger. */
+export function CommentaireTutelle({ texte }: { texte?: string }) {
+  if (!texte) return null;
+  return (
+    <div className="mb-3 flex gap-2.5 rounded-xl border border-danger/25 bg-danger-doux/60 px-4 py-3 text-sm">
+      <MessageSquareWarning className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+      <p><span className="font-semibold text-danger">Correction demandée : </span>{texte}</p>
+    </div>
+  );
+}
 
 /** Nettoie les nombres saisis à la française (« 1 250 000,50 ») avant l'envoi au serveur. */
 export function versEnvoi(module: Module, valeurs: Record<string, Valeur>) {
@@ -17,7 +37,7 @@ export function versEnvoi(module: Module, valeurs: Record<string, Valeur>) {
   module.questions.forEach((q) => {
     if (q.type === "fichier") return;
     const v = valeurs[q.code];
-    sortie[q.code] = numerique(q.type) && typeof v === "string" ? v.replace(/[\s  ]/g, "").replace(",", ".") : v;
+    sortie[q.code] = numerique(q.type) && typeof v === "string" ? nettoyerNombre(v) : v;
   });
   return sortie;
 }
@@ -25,9 +45,14 @@ export function versEnvoi(module: Module, valeurs: Record<string, Valeur>) {
 /** Valeur lisible pour le récapitulatif. */
 export function lisible(q: Question, v: Valeur): string {
   if (v === null || v === undefined || v === "" || (Array.isArray(v) && !v.length)) return "";
+  if (q.type === "tableau" && Array.isArray(v)) {
+    return (v as LigneTableau[]).map((l) => (q.colonnes ?? []).map((c) => l[c.code] ?? "").join(" · ")).join(" ; ");
+  }
+  if (q.type === "date" && typeof v === "string") return date(v);
+  if (q.type === "echelle") return `${v} / ${q.max ?? 5}`;
   if (q.choix) {
     const lib = (x: string) => q.choix!.find((c) => c.valeur === x)?.libelle ?? x;
-    return Array.isArray(v) ? v.map(lib).join(", ") : lib(String(v));
+    return Array.isArray(v) ? (v as string[]).map(lib).join(", ") : lib(String(v));
   }
   if (numerique(q.type) && !q.annee) {
     const n = Number(v);
@@ -46,6 +71,34 @@ export function ChampQuestion({ question: q, valeur, erreurs, changer }: {
   const enErreur = !!erreurs?.length;
   const bordure = cx("w-full rounded-[10px] border bg-surface px-3.5 text-[15px] text-encre transition-shadow placeholder:text-discret/60",
     "focus:border-marque focus:shadow-anneau focus:outline-none", enErreur ? "border-danger" : "border-trait");
+
+  if (q.type === "echelle") {
+    const min = q.min ?? 1, max = q.max ?? 5;
+    const crans = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+    return (
+      <fieldset aria-describedby={`${id}-m`}>
+        <legend className="mb-3"><Etiquette code={q.code} obligatoire={q.obligatoire}>{q.libelle}</Etiquette></legend>
+        <div className="flex max-w-lg gap-2" role="radiogroup">
+          {crans.map((n) => {
+            const actif = String(valeur ?? "") === String(n);
+            return (
+              <label key={n} className={cx("grid h-12 flex-1 cursor-pointer place-items-center rounded-xl border text-sm font-semibold transition chiffres",
+                actif ? "border-marque bg-marque text-white shadow-[0_0_0_1px_rgb(var(--marque))] dark:text-[#04140c]" : "border-trait bg-surface hover:bg-relief/60",
+                enErreur && !actif && "border-danger/40")}>
+                <input type="radio" name={q.code} value={n} checked={actif} onChange={() => changer(String(n))} className="sr-only" />{n}
+              </label>
+            );
+          })}
+        </div>
+        {(q.libelle_min || q.libelle_max) && (
+          <div className="mt-1.5 flex max-w-lg justify-between text-xs text-discret"><span>{q.libelle_min}</span><span>{q.libelle_max}</span></div>
+        )}
+        <div className="mt-2"><MessageChamp id={`${id}-m`} erreurs={erreurs} aide={q.aide} /></div>
+      </fieldset>
+    );
+  }
+
+  if (q.type === "tableau") return <ChampTableau question={q} valeur={valeur} erreurs={erreurs} changer={changer} />;
 
   if (q.type === "choix" || q.type === "oui_non" || q.type === "choix_multiple") {
     const multiple = q.type === "choix_multiple";
@@ -96,7 +149,7 @@ export function ChampQuestion({ question: q, valeur, erreurs, changer }: {
   }
 
   const estNombre = numerique(q.type);
-  const brut = estNombre ? Number(texte.replace(/[\s  ]/g, "").replace(",", ".")) : NaN;
+  const brut = estNombre ? Number(nettoyerNombre(texte)) : NaN;
   const apercu = q.type === "montant" && texte && !Number.isNaN(brut) && brut >= 10000 ? `≈ ${compacte(brut)}` : null;
   const suffixe = q.type === "pourcentage" ? "%" : q.unite ?? (q.type === "montant" ? "monnaie locale" : undefined);
 
@@ -114,6 +167,56 @@ export function ChampQuestion({ question: q, valeur, erreurs, changer }: {
         <MessageChamp erreurs={erreurs} aide={q.aide ?? (q.min !== undefined && q.max !== undefined && !q.annee ? `Entre ${nombre(q.min)} et ${nombre(q.max)}.` : undefined)} />
         {apercu && !erreurs?.length && <span className="text-[13px] font-medium text-marque">{apercu}</span>}
       </div>
+    </div>
+  );
+}
+
+/* ---------- Tableau à lignes répétables ---------- */
+
+function ChampTableau({ question: q, valeur, erreurs, changer }: {
+  question: Question; valeur: Valeur; erreurs?: string[]; changer: (v: Valeur) => void;
+}) {
+  const colonnes = q.colonnes ?? [];
+  const lignes = (Array.isArray(valeur) ? valeur : []) as LigneTableau[];
+  const vide = () => Object.fromEntries(colonnes.map((c) => [c.code, ""])) as LigneTableau;
+  const affichees = lignes.length ? lignes : [vide()];
+  const maj = (i: number, code: string, v: string) =>
+    changer(affichees.map((l, j) => (j === i ? { ...l, [code]: v } : l)));
+  return (
+    <div className="flex flex-col gap-3">
+      <Etiquette code={q.code} obligatoire={q.obligatoire}>{q.libelle}</Etiquette>
+      <div className="overflow-x-auto rounded-xl border border-trait">
+        <table className="w-full min-w-[520px] text-sm">
+          <thead className="bg-relief/60 text-left text-xs text-discret">
+            <tr>{colonnes.map((c) => <th key={c.code} className="px-3 py-2 font-medium">{c.libelle}</th>)}<th className="w-10" /></tr>
+          </thead>
+          <tbody className="divide-y divide-trait">
+            {affichees.map((l, i) => (
+              <tr key={i}>
+                {colonnes.map((c) => (
+                  <td key={c.code} className="p-1.5">
+                    <input value={String(l[c.code] ?? "")} onChange={(e) => maj(i, c.code, e.target.value)}
+                      aria-label={`${c.libelle}, ligne ${i + 1}`} inputMode={c.type === "nombre" ? "decimal" : undefined}
+                      className={cx("h-10 w-full rounded-lg border border-transparent bg-transparent px-2.5 focus:border-marque focus:bg-surface focus:outline-none",
+                        c.type === "nombre" && "chiffres text-right")} />
+                  </td>
+                ))}
+                <td className="p-1.5">
+                  <button type="button" onClick={() => changer(affichees.filter((_, j) => j !== i))} aria-label={`Supprimer la ligne ${i + 1}`}
+                    className="grid h-9 w-9 place-items-center rounded-lg text-discret hover:bg-danger-doux hover:text-danger"><X className="h-4 w-4" /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex items-center gap-3">
+        <Bouton taille="sm" variante="secondaire" disabled={affichees.length >= 20} onClick={() => changer([...affichees, vide()])}>
+          <Plus className="h-4 w-4" /> Ajouter une ligne
+        </Bouton>
+        <span className="text-xs text-discret">{affichees.length} / 20</span>
+      </div>
+      <MessageChamp erreurs={erreurs} aide={q.aide} />
     </div>
   );
 }

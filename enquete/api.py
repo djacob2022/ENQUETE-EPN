@@ -754,12 +754,14 @@ def epn_liste(request):
         e = form.save()
         tracer(request, "epn", e.nom, creation=True, valeurs=serializers.epn(e))
         return JsonResponse(serializers.epn(e), status=201)
+    _exiger(request, "voir_nominatif")  # e-mails des points focaux
     return JsonResponse({"epn": [serializers.epn(e) for e in _dans_perimetre(request, EPN.objects.all(), "tutelle")]})
 
 
 @require_http_methods(["GET", "PUT"])
 @equipe
 def epn_fiche(request, pk):
+    _exiger(request, "voir_nominatif")
     e = get_object_or_404(_dans_perimetre(request, EPN.objects.all(), "tutelle"), pk=pk)
     if request.method == "PUT":
         _exiger(request, "gerer_repertoire")

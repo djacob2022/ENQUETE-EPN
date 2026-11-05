@@ -100,6 +100,11 @@ class CircuitDeValidationTests(Outils):
         actions = list(Journal.objects.order_by("pk").values_list("action", flat=True))
         for a in ("revue", "correction", "soumission", "validation"):
             self.assertIn(a, actions)
+        # Notifications (F-47) : limitées au périmètre du superviseur.
+        notes = self.client.get(reverse("api:notifications")).json()["notifications"]
+        self.assertEqual({n["action"] for n in notes}, {"soumission", "validation", "correction"})
+        self.client.force_login(compte("sante", "superviseur", "Santé"))
+        self.assertEqual(self.client.get(reverse("api:notifications")).json()["notifications"], [])
 
     def test_prolongation_du_delai_pour_un_epn(self):
         """F-20 : un délai propre à l'EPN rouvre la saisie après la clôture."""
@@ -131,7 +136,8 @@ class RolesEtComptesTests(Outils):
         self.client.force_login(compte("lecteur", "lecteur"))
         tdb = self.client.get(reverse("api:tableau_de_bord")).json()
         self.assertEqual(tdb["dernieres"][0]["repondant"], "")
-        for nom, args in (("api:reponses", []), ("api:reponse_detail", [r.pk]), ("api:export", []), ("api:liens", [])):
+        for nom, args in (("api:reponses", []), ("api:reponse_detail", [r.pk]), ("api:export", []), ("api:liens", []),
+                          ("api:epn", []), ("api:epn_fiche", [self.epn.pk])):
             self.assertEqual(self.client.get(reverse(nom, args=args)).status_code, 403, nom)
         self.assertEqual(self.client.get(reverse("api:statistiques")).status_code, 200)
         wb = load_workbook(BytesIO(self.client.get(reverse("api:statistiques_xlsx")).content))
@@ -355,3 +361,20 @@ class CampagneEtRepertoireTests(Outils):
         self.assertIn("Message du ministre.", mail.outbox[-1].body)
         self.client.force_login(compte("analyste", "analyste"))
         self.assertEqual(self.post("api:parametres", donnees={"pays": "X"}).status_code, 403)
+
+
+@override_settings(**REGLAGES)
+class DonneesDemoTests(Base):
+    def test_donnees_de_demonstration_conformes_au_questionnaire(self):
+        """Les réponses fictives respectent le questionnaire : complètes, cohérentes, tous les statuts représentés."""
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        from enquete.services import recalculer_completude
+        call_command("donnees_demo", stdout=StringIO())
+        c = Campagne.objects.get(nom="Enquête annuelle 2025 (démo)")
+        statuts = set(c.reponses.values_list("statut", flat=True))
+        self.assertTrue({"valide", "soumis", "en_revue", "a_corriger", "en_cours", "invite"} <= statuts)
+        for r in c.reponses.filter(statut__in=["valide", "soumis", "en_revue"]):
+            self.assertEqual(sorted(recalculer_completude(r)), sorted(c.q.codes_modules()), r.epn.nom)

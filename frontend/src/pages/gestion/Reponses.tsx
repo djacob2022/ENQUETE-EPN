@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDownUp, BellRing, Check, Copy, Download, ExternalLink, FileArchive, FileText, Inbox, KeyRound, Mail, Phone, RotateCcw, Search, Send,
+  ArrowDownUp, BellRing, CalendarClock, Check, CircleCheckBig, Copy, Download, ExternalLink, FileArchive, FileSpreadsheet, FileText,
+  Inbox, KeyRound, Mail, MessageSquareWarning, Phone, RotateCcw, ScanSearch, Search, Send, TriangleAlert, X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -9,12 +10,49 @@ import { copier } from "@/lib/presse-papiers";
 import { date, ilYa, taille } from "@/lib/format";
 import { ReponseDetail, ReponseResume, Statut } from "@/lib/types";
 import { BadgeStatut, Bouton, Carte, cx, Dialogue, Liste, Progression, Squelette, Tiroir, useToast, Vide } from "@/ui";
-import { EnTetePage, SansCampagne, useGestion } from "./Gestion";
+import { EnTetePage, peut, SansCampagne, useGestion } from "./Gestion";
+
+const FILTRES_STATUT: { v: string; l: string }[] = [
+  { v: "", l: "Tous" }, { v: "soumis", l: "À examiner" }, { v: "en_revue", l: "En revue" }, { v: "a_corriger", l: "À corriger" },
+  { v: "valide", l: "Validés" }, { v: "en_cours", l: "Brouillons" }, { v: "invite", l: "Non commencés" },
+];
+
+/** Menu d'export : Excel ou CSV, réponses validées (par défaut), envoyées ou toutes (F-34, F-35, F-37). */
+export function MenuExport({ params }: { params: Record<string, string | number | undefined> }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [base, setBase] = useState(params.statut ? "statut" : "validees");
+  const lien = (format: "xlsx" | "csv") => avecParams(`/api/gestion/export.${format}`, { ...params, base: params.statut ? undefined : base });
+  return (
+    <div className="relative">
+      <Bouton icone={<Download className="h-4 w-4" />} onClick={() => setOuvert((o) => !o)} aria-expanded={ouvert}>Exporter</Bouton>
+      {ouvert && (<>
+        <div className="fixed inset-0 z-30" onClick={() => setOuvert(false)} />
+        <div className="absolute right-0 z-40 mt-2 w-72 rounded-2xl border border-trait bg-surface p-4 shadow-flottant">
+          {!params.statut && (
+            <Liste libelle="Réponses à exporter" value={base} onChange={(e) => setBase(e.target.value)}>
+              <option value="validees">Validées seulement</option>
+              <option value="envoyees">Envoyées (soumises, en revue, validées)</option>
+              <option value="toutes">Toutes, brouillons compris</option>
+            </Liste>
+          )}
+          {params.statut && <p className="text-sm text-discret">Export du filtre de statut en cours.</p>}
+          <div className="mt-3 grid gap-2">
+            <a href={lien("xlsx")} onClick={() => setOuvert(false)} className="flex items-center gap-2 rounded-xl border border-trait px-3 py-2.5 text-sm font-medium hover:bg-relief">
+              <FileSpreadsheet className="h-4 w-4 text-succes" /> Excel (.xlsx) avec dictionnaire</a>
+            <a href={lien("csv")} onClick={() => setOuvert(false)} className="flex items-center gap-2 rounded-xl border border-trait px-3 py-2.5 text-sm font-medium hover:bg-relief">
+              <FileText className="h-4 w-4 text-discret" /> CSV UTF-8 (SPSS, Stata, R)</a>
+          </div>
+          <p className="mt-3 text-xs text-discret">Les filtres de la page s'appliquent. Chaque export est inscrit au journal d'audit.</p>
+        </div>
+      </>)}
+    </div>
+  );
+}
 
 type Tri = "epn" | "tutelle" | "avancement" | "date";
 
 export default function Reponses() {
-  const { campagne, options } = useGestion();
+  const { campagne, options, moi } = useGestion();
   const [params, setParams] = useSearchParams();
   const [recherche, setRecherche] = useState("");
   const [tri, setTri] = useState<{ col: Tri; asc: boolean }>({ col: "epn", asc: true });
@@ -43,7 +81,6 @@ export default function Reponses() {
   const ouvrir = (id: number | null) => changerFiltre("ouvrir", id ? String(id) : "");
 
   if (!campagne) return <SansCampagne />;
-  const exporter = avecParams("/api/gestion/export.xlsx", { campagne: campagne.id, ...filtres, toutes: filtres.statut ? undefined : 1 });
   const nb = (s: Statut) => (q.data?.reponses ?? []).filter((r) => r.statut === s).length;
 
   const EnTeteTri = ({ col, children, className }: { col: Tri; children: React.ReactNode; className?: string }) => (
@@ -58,11 +95,10 @@ export default function Reponses() {
   return (
     <>
       <EnTetePage titre="Réponses" sous={`${q.data?.reponses.length ?? "…"} établissements invités · ${campagne.nom}`}
-        actions={<a href={exporter} className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-trait bg-surface px-4 text-sm font-medium shadow-sm transition hover:bg-relief">
-          <Download className="h-4 w-4" /> Exporter la sélection</a>} />
+        actions={peut(moi, "exporter") && <MenuExport params={{ campagne: campagne.id, ...filtres }} />} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {[{ v: "", l: "Tous" }, { v: "soumis", l: "Envoyés" }, { v: "en_cours", l: "En cours" }, { v: "invite", l: "Non commencés" }].map((s) => (
+        {FILTRES_STATUT.map((s) => (
           <button key={s.v} onClick={() => changerFiltre("statut", s.v)}
             className={cx("inline-flex h-9 items-center gap-2 rounded-full border px-4 text-sm transition",
               filtres.statut === s.v ? "border-encre bg-encre text-fond" : "border-trait bg-surface text-discret hover:text-encre")}>
@@ -107,7 +143,7 @@ export default function Reponses() {
                     <p className="text-xs text-discret">{[r.epn.sigle, r.epn.categorie].filter(Boolean).join(" · ")}</p>
                   </td>
                   <td className="px-4 py-3 text-discret">{r.epn.tutelle}</td>
-                  <td className="px-4 py-3"><BadgeStatut statut={r.statut} /></td>
+                  <td className="px-4 py-3"><BadgeStatut statut={r.statut} />{r.date_limite && <p className="mt-1 text-[11px] text-discret">Délai : {date(r.date_limite)}</p>}</td>
                   <td className="px-4 py-3"><div className="flex items-center gap-3"><Progression valeur={r.avancement} className="w-24" ton={r.avancement === 100 ? "succes" : "marque"} /><span className="chiffres w-10 text-xs text-discret">{r.avancement} %</span></div></td>
                   <td className="px-4 py-3">{r.repondant ? <><p>{r.repondant}</p><p className="text-xs text-discret">{r.telephone}</p></> : <span className="text-discret">—</span>}</td>
                   <td className="py-3 pl-4 pr-6 text-xs text-discret">{r.date_soumission ? `Envoyé ${ilYa(r.date_soumission)}` : r.date_modification ? `Modifié ${ilYa(r.date_modification)}` : "—"}</td>
@@ -126,18 +162,25 @@ export default function Reponses() {
   );
 }
 
+type Action = "relancer" | "inviter" | "rouvrir" | "remplacer-lien" | "revue" | "valider" | "corriger" | "prolonger";
+
 function DetailReponse({ id }: { id: number }) {
+  const { moi } = useGestion();
   const client = useQueryClient();
   const toast = useToast();
+  const [correction, setCorrection] = useState(false);
+  const [commentaires, setCommentaires] = useState<Record<string, string>>({});
+  const [prolonger, setProlonger] = useState<string | null>(null);
   const [onglet, setOnglet] = useState<"reponses" | "pieces" | "historique">("reponses");
   const [copie, setCopie] = useState(false);
   const [remplacer, setRemplacer] = useState(false);
   const [envoyerNouveau, setEnvoyerNouveau] = useState(true);
   const q = useQuery({ queryKey: ["reponse-detail", id], queryFn: () => api.get<ReponseDetail>(`/api/gestion/reponses/${id}/`) });
   const action = useMutation({
-    mutationFn: (a: "relancer" | "inviter" | "rouvrir" | "remplacer-lien") =>
-      api.post<{ message: string; reponse: ReponseDetail }>(`/api/gestion/reponses/${id}/${a}/`, a === "remplacer-lien" ? { envoyer: envoyerNouveau } : {}),
-    onSuccess: (r) => { setRemplacer(false); client.setQueryData(["reponse-detail", id], r.reponse); client.invalidateQueries({ queryKey: ["liens"] }); client.invalidateQueries({ queryKey: ["reponses"] }); client.invalidateQueries({ queryKey: ["tableau"] }); toast("succes", r.message); },
+    mutationFn: (a: Action) =>
+      api.post<{ message: string; reponse: ReponseDetail }>(`/api/gestion/reponses/${id}/${a}/`,
+        a === "remplacer-lien" ? { envoyer: envoyerNouveau } : a === "corriger" ? { commentaires } : a === "prolonger" ? { date: prolonger } : {}),
+    onSuccess: (r) => { setRemplacer(false); setCorrection(false); setCommentaires({}); setProlonger(null); client.invalidateQueries({ queryKey: ["notifications"] }); client.setQueryData(["reponse-detail", id], r.reponse); client.invalidateQueries({ queryKey: ["liens"] }); client.invalidateQueries({ queryKey: ["reponses"] }); client.invalidateQueries({ queryKey: ["tableau"] }); toast("succes", r.message); },
     onError: (e: ErreurApi) => toast("erreur", e.message),
   });
 
@@ -158,16 +201,32 @@ function DetailReponse({ id }: { id: number }) {
         <h2 className="titre-display mt-2 text-3xl">{r.epn.nom}</h2>
         <div className="mt-4 flex items-center gap-3"><Progression valeur={r.avancement} className="flex-1" ton={r.avancement === 100 ? "succes" : "marque"} /><span className="chiffres text-sm font-medium">{r.avancement} %</span></div>
         <div className="mt-5 flex flex-wrap gap-2">
-          {r.statut === "soumis"
-            ? <Bouton taille="sm" icone={<RotateCcw className="h-3.5 w-3.5" />} chargement={action.isPending} onClick={() => action.mutate("rouvrir")}>Rouvrir pour correction</Bouton>
-            : <>
-                <Bouton taille="sm" variante="primaire" icone={<BellRing className="h-3.5 w-3.5" />} chargement={action.isPending && action.variables === "relancer"} onClick={() => action.mutate("relancer")}>Relancer</Bouton>
-                <Bouton taille="sm" icone={<Send className="h-3.5 w-3.5" />} chargement={action.isPending && action.variables === "inviter"} onClick={() => action.mutate("inviter")}>{r.date_invitation ? "Renvoyer l'invitation" : "Envoyer l'invitation"}</Bouton>
-              </>}
-          <Bouton taille="sm" icone={copie ? <Check className="h-3.5 w-3.5 text-succes" /> : <Copy className="h-3.5 w-3.5" />} onClick={copierLien}>{copie ? "Lien copié" : "Copier le lien"}</Bouton>
-          <a href={r.lien} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-2 rounded-[10px] px-3 text-[13px] font-medium text-discret hover:bg-relief hover:text-encre"><ExternalLink className="h-3.5 w-3.5" /> Ouvrir le formulaire</a>
-          <Bouton taille="sm" variante="fantome" icone={<KeyRound className="h-3.5 w-3.5" />} onClick={() => setRemplacer(true)} className="text-danger hover:text-danger">Remplacer le lien</Bouton>
+          {peut(moi, "valider") && (r.statut === "soumis" || r.statut === "en_revue") && <>
+            <Bouton taille="sm" variante="primaire" icone={<CircleCheckBig className="h-3.5 w-3.5" />} chargement={action.isPending && action.variables === "valider"} onClick={() => action.mutate("valider")}>Valider</Bouton>
+            <Bouton taille="sm" icone={<MessageSquareWarning className="h-3.5 w-3.5" />} onClick={() => { setOnglet("reponses"); setCorrection(true); }}>Renvoyer pour correction</Bouton>
+            {r.statut === "soumis" && <Bouton taille="sm" variante="fantome" icone={<ScanSearch className="h-3.5 w-3.5" />} chargement={action.isPending && action.variables === "revue"} onClick={() => action.mutate("revue")}>Prendre en revue</Bouton>}
+          </>}
+          {peut(moi, "valider") && r.statut === "valide" && <Bouton taille="sm" icone={<RotateCcw className="h-3.5 w-3.5" />} chargement={action.isPending} onClick={() => action.mutate("rouvrir")}>Rouvrir</Bouton>}
+          {!["soumis", "en_revue", "valide"].includes(r.statut) && <>
+            {peut(moi, "relancer") && <Bouton taille="sm" variante="primaire" icone={<BellRing className="h-3.5 w-3.5" />} chargement={action.isPending && action.variables === "relancer"} onClick={() => action.mutate("relancer")}>Relancer</Bouton>}
+            {peut(moi, "gerer_liens") && <Bouton taille="sm" icone={<Send className="h-3.5 w-3.5" />} chargement={action.isPending && action.variables === "inviter"} onClick={() => action.mutate("inviter")}>{r.date_invitation ? "Renvoyer l'invitation" : "Envoyer l'invitation"}</Bouton>}
+            {peut(moi, "valider") && <Bouton taille="sm" variante="fantome" icone={<CalendarClock className="h-3.5 w-3.5" />} onClick={() => setProlonger(r.date_limite ?? "")}>Prolonger le délai</Bouton>}
+          </>}
+          {peut(moi, "exporter") && <a href={r.export_url} className="inline-flex h-9 items-center gap-2 rounded-[10px] border border-trait px-3 text-[13px] font-medium hover:bg-relief"><FileSpreadsheet className="h-3.5 w-3.5" /> Excel</a>}
+          {peut(moi, "gerer_liens") && <>
+            <Bouton taille="sm" icone={copie ? <Check className="h-3.5 w-3.5 text-succes" /> : <Copy className="h-3.5 w-3.5" />} onClick={copierLien}>{copie ? "Lien copié" : "Copier le lien"}</Bouton>
+            <a href={r.lien} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-2 rounded-[10px] px-3 text-[13px] font-medium text-discret hover:bg-relief hover:text-encre"><ExternalLink className="h-3.5 w-3.5" /> Ouvrir le formulaire</a>
+            <Bouton taille="sm" variante="fantome" icone={<KeyRound className="h-3.5 w-3.5" />} onClick={() => setRemplacer(true)} className="text-danger hover:text-danger">Remplacer le lien</Bouton>
+          </>}
         </div>
+        {r.statut === "valide" && <p className="mt-3 text-xs text-discret">Validée le {date(r.date_validation, true)}{r.valide_par && ` par ${r.valide_par}`}.</p>}
+        {r.date_limite && <p className="mt-3 text-xs text-discret">Délai accordé à cet établissement : {date(r.date_limite)}.</p>}
+        {r.statut === "a_corriger" && Object.keys(r.commentaires).length > 0 && (
+          <div className="mt-4 rounded-xl border border-danger/25 bg-danger-doux/60 p-3 text-sm">
+            <p className="font-semibold text-danger">Corrections demandées à l'établissement</p>
+            <ul className="mt-1 space-y-0.5">{Object.entries(r.commentaires).map(([c, t]) => <li key={c}><span className="font-mono text-xs">{c === "general" ? "Général" : c}</span> : {t}</li>)}</ul>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-3 border-b border-trait bg-surface px-6 py-4 text-sm sm:grid-cols-3">
@@ -190,6 +249,10 @@ function DetailReponse({ id }: { id: number }) {
       </div>
 
       <div className="space-y-4 p-6">
+        {onglet === "reponses" && r.exercice_precedent && (
+          <p className="flex items-center gap-2 text-xs text-discret"><TriangleAlert className="h-3.5 w-3.5 text-alerte" />
+            Comparaison avec l'exercice {r.exercice_precedent} : les écarts de plus de 50 % sont signalés.</p>
+        )}
         {onglet === "reponses" && r.modules.map((m) => (
           <Carte key={m.code} className="overflow-hidden">
             <div className="flex items-center gap-3 border-b border-trait px-5 py-3">
@@ -199,11 +262,23 @@ function DetailReponse({ id }: { id: number }) {
             </div>
             <dl className="divide-y divide-trait">
               {m.lignes.map((l) => (
-                <div key={l.code} className="grid gap-1 px-5 py-2.5 text-sm sm:grid-cols-[1fr_1fr] sm:gap-4">
-                  <dt className="text-discret">{l.libelle}</dt>
-                  <dd className={cx("font-medium", !l.valeur && "font-normal text-discret/60")}>
-                    {l.piece ? <a href={l.piece.url} className="inline-flex items-center gap-1.5 text-marque hover:underline"><FileText className="h-3.5 w-3.5" />{l.piece.nom}</a> : l.valeur || "—"}
-                  </dd>
+                <div key={l.code} className={cx("px-5 py-2.5 text-sm", l.anomalie && "bg-alerte-doux/50")}>
+                  <div className="grid gap-1 sm:grid-cols-[1fr_1fr] sm:gap-4">
+                    <dt className="text-discret"><span className="mr-1.5 font-mono text-[11px]">{l.code}</span>{l.libelle}</dt>
+                    <dd className={cx("font-medium", !l.valeur && "font-normal text-discret/60")}>
+                      {l.piece ? <a href={l.piece.url} className="inline-flex items-center gap-1.5 text-marque hover:underline"><FileText className="h-3.5 w-3.5" />{l.piece.nom}</a> : l.valeur || "—"}
+                      {l.precedent !== undefined && (
+                        <span className={cx("ml-2 text-xs font-normal", l.anomalie ? "font-medium text-alerte" : "text-discret")}>
+                          N-1 : {l.precedent}{l.ecart !== undefined && ` (${l.ecart > 0 ? "+" : ""}${l.ecart} %)`}
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                  {correction && (
+                    <input value={commentaires[l.code] ?? ""} onChange={(e) => setCommentaires((c) => ({ ...c, [l.code]: e.target.value }))}
+                      placeholder="Commentaire pour l'établissement (facultatif)" aria-label={`Commentaire sur ${l.code}`}
+                      className="mt-2 h-9 w-full rounded-lg border border-trait bg-surface px-3 text-sm focus:border-danger focus:outline-none" />
+                  )}
                 </div>
               ))}
             </dl>
@@ -238,7 +313,32 @@ function DetailReponse({ id }: { id: number }) {
           </ol>
         ))}
       </div>
+      {correction && (
+        <div className="sticky bottom-0 z-10 border-t border-trait bg-surface p-4 shadow-flottant">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">Renvoyer pour correction</p>
+            <Bouton taille="sm" variante="fantome" aria-label="Annuler" onClick={() => { setCorrection(false); setCommentaires({}); }}><X className="h-4 w-4" /></Bouton>
+          </div>
+          <textarea value={commentaires.general ?? ""} onChange={(e) => setCommentaires((c) => ({ ...c, general: e.target.value }))} rows={2}
+            placeholder="Message général à l'établissement" aria-label="Message général"
+            className="mt-2 w-full rounded-lg border border-trait bg-surface px-3 py-2 text-sm focus:border-danger focus:outline-none" />
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className="text-xs text-discret">{Object.values(commentaires).filter((t) => t.trim()).length} commentaire(s). Ajoutez-les sous chaque question concernée.</p>
+            <Bouton variante="danger" taille="sm" disabled={!Object.values(commentaires).some((t) => t.trim())}
+              chargement={action.isPending && action.variables === "corriger"} onClick={() => action.mutate("corriger")}>Renvoyer à l'établissement</Bouton>
+          </div>
+        </div>
+      )}
     </div>
+      <Dialogue ouvert={prolonger !== null} fermer={() => setProlonger(null)} titre={`Prolonger le délai de ${r.epn.nom}`}
+        description={`Clôture de la campagne : ${date(r.campagne.date_cloture)}. Le nouveau délai ne vaut que pour cet établissement.`}>
+        <input type="date" value={prolonger ?? ""} min={r.campagne.date_cloture} onChange={(e) => setProlonger(e.target.value)} aria-label="Nouveau délai"
+          className="h-11 w-full rounded-[10px] border border-trait bg-surface px-3 text-sm focus:border-marque focus:outline-none" />
+        <div className="mt-5 flex justify-end gap-2">
+          {r.date_limite && <Bouton variante="fantome" onClick={() => { setProlonger(""); setTimeout(() => action.mutate("prolonger")); }}>Revenir à la clôture</Bouton>}
+          <Bouton variante="primaire" disabled={!prolonger} chargement={action.isPending && action.variables === "prolonger"} onClick={() => action.mutate("prolonger")}>Accorder ce délai</Bouton>
+        </div>
+      </Dialogue>
       <Dialogue ouvert={remplacer} fermer={() => setRemplacer(false)} titre={`Remplacer le lien de ${r.epn.nom} ?`}
         description="À utiliser si le lien a été transmis à une mauvaise personne ou si un agent a quitté l'établissement.">
         <ul className="space-y-2 text-sm">

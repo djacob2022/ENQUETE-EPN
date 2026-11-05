@@ -1,12 +1,12 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, CircleCheck, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, CircleCheck, History, MessageSquareWarning, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { api, ErreurApi } from "@/lib/api";
 import { nombre } from "@/lib/format";
 import { Module, ReponsePublique, Valeur } from "@/lib/types";
 import { Bouton, Carte, cx, useToast } from "@/ui";
-import { ChampQuestion, DepotFichier, versEnvoi } from "./Questions";
+import { ChampQuestion, CommentaireTutelle, DepotFichier, estPosee, versEnvoi } from "./Questions";
 import { urlApi, useFormulaire } from "./Formulaire";
 
 type Valeurs = Record<string, Valeur>;
@@ -16,7 +16,8 @@ function valeursInitiales(module: Module, donnees: Record<string, Valeur>): Vale
   module.questions.forEach((q) => {
     if (q.type === "fichier") return;
     const d = donnees[q.code];
-    v[q.code] = q.type === "choix_multiple" ? (Array.isArray(d) ? d : []) : d === null || d === undefined ? "" : String(d);
+    v[q.code] = q.type === "choix_multiple" || q.type === "tableau" ? (Array.isArray(d) ? d : [])
+      : d === null || d === undefined ? "" : String(d);
   });
   return v;
 }
@@ -37,6 +38,7 @@ function FormulaireRubrique({ module, index, donnees }: { module: Module; index:
   const [valeurs, setValeurs] = useState<Valeurs>(() => valeursInitiales(module, donnees));
   const [erreurs, setErreurs] = useState<Record<string, string[]>>({});
   const [envoi, setEnvoi] = useState(false);
+  const [reprise, setReprise] = useState(false);
   const minuterie = useRef<number>();
   const modifie = useRef(false);
   const total = questionnaire.modules.length;
@@ -103,6 +105,25 @@ function FormulaireRubrique({ module, index, donnees }: { module: Module; index:
   }
 
   const verifications = useMemo(() => controlesEnDirect(module.code, valeurs), [module.code, valeurs]);
+  // Conditions d'affichage : réponses des autres rubriques + saisie en cours de celle-ci.
+  const contexte = useMemo(() => ({ ...reponse.donnees, ...valeurs }), [reponse.donnees, valeurs]);
+  const posees = module.questions.filter((q) => estPosee(q, contexte));
+  const commentaires = reponse.commentaires ?? {};
+  const aCorriger = module.questions.filter((q) => commentaires[q.code]).length;
+
+  async function reprendre() {
+    setReprise(true);
+    try {
+      const r = await api.post<{ repris: number; exercice: number; reponse: ReponsePublique }>(urlApi(jeton, `modules/${module.code}/preremplir/`));
+      mettreAJour(r.reponse);
+      setValeurs(valeursInitiales(module, r.reponse.donnees));
+      toast("succes", r.repris ? `${r.repris} réponse${r.repris > 1 ? "s" : ""} reprise${r.repris > 1 ? "s" : ""} de l'exercice ${r.exercice}. Vérifiez-les et mettez-les à jour.` : "Rien à reprendre pour cette rubrique.");
+    } catch (e) {
+      toast("erreur", (e as ErreurApi).message);
+    } finally {
+      setReprise(false);
+    }
+  }
 
   return (
     <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
@@ -111,7 +132,19 @@ function FormulaireRubrique({ module, index, donnees }: { module: Module; index:
         <p className="text-sm font-medium text-marque">Rubrique {module.code} · {index + 1} sur {total}</p>
         <h1 className="titre-display mt-1 text-4xl sm:text-[44px]">{module.titre}</h1>
         {module.intro && <p className="mt-2 max-w-2xl text-discret">{module.intro}</p>}
+        {reponse.precedente && module.questions.some((q) => q.type !== "fichier") && (
+          <Bouton taille="sm" className="mt-4" chargement={reprise} onClick={reprendre}>
+            <History className="h-4 w-4" /> Reprendre mes réponses de l'exercice {reponse.precedente}
+          </Bouton>
+        )}
       </div>
+
+      {aCorriger > 0 && (
+        <div className="mb-4 flex gap-3 rounded-2xl border border-danger/30 bg-danger-doux p-4 text-sm">
+          <MessageSquareWarning className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
+          <p><strong className="text-danger">La tutelle demande {aCorriger > 1 ? `${aCorriger} corrections` : "une correction"} dans cette rubrique.</strong> Les questions concernées sont signalées ci-dessous.</p>
+        </div>
+      )}
 
       <AnimatePresence>
         {verifications.length > 0 && (
@@ -129,13 +162,15 @@ function FormulaireRubrique({ module, index, donnees }: { module: Module; index:
 
       <Carte>
         <div className="divide-y divide-trait">
-          {module.questions.map((q) => (
-            <div key={q.code} className="px-6 py-6 sm:px-8" data-erreur={!!erreurs[q.code]}>
+          {posees.map((q) => (
+            <motion.div key={q.code} initial={q.si ? { opacity: 0, height: 0 } : false} animate={{ opacity: 1, height: "auto" }}
+              className="px-6 py-6 sm:px-8" data-erreur={!!erreurs[q.code]}>
+              <CommentaireTutelle texte={commentaires[q.code]} />
               {q.type === "fichier"
                 ? <DepotFichier question={q} piece={reponse.pieces[q.code]} erreurs={erreurs[q.code]}
                     effacerErreur={() => setErreurs(({ [q.code]: _, ...r }) => r)} />
                 : <ChampQuestion question={q} valeur={valeurs[q.code]} erreurs={erreurs[q.code]} changer={(v) => changer(q.code, v)} />}
-            </div>
+            </motion.div>
           ))}
         </div>
       </Carte>
