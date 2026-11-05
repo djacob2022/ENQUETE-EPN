@@ -67,10 +67,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t enquete-epn/application:${{ github.sha }} .
-      - name: Analyse des vulnérabilités
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: enquete-epn/application:${{ github.sha }}
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "1"
+      - name: Analyse des vulnérabilités (Trivy)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.1 image \
+            --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --no-progress \
+            enquete-epn/application:${{ github.sha }}
