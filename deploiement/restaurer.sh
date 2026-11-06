@@ -10,6 +10,10 @@ if grep -q '^CLOUDFLARE_TUNNEL_TOKEN=..' .env 2>/dev/null; then
 else
   COMPOSE="docker compose -f docker-compose.yml -f deploiement/docker-compose.prod.yml"
 fi
+# Base hébergée (Supabase) si DATABASE_URL est réglé dans .env.
+if grep -q '^DATABASE_URL=..' .env 2>/dev/null; then
+  COMPOSE="$COMPOSE -f deploiement/docker-compose.supabase.yml"
+fi
 
 if [ $# -eq 0 ]; then
   echo "Sauvegardes disponibles :"
@@ -27,7 +31,7 @@ read -r REPONSE
 echo "== Arrêt de l'application"
 $COMPOSE stop web
 echo "== Base de données"
-$COMPOSE exec -T -e FICHIER="/backups/enquete_$DATE.dump" backup sh -c 'pg_restore --clean --if-exists --no-owner -d "$PGDATABASE" "$FICHIER"' \
+$COMPOSE exec -T -e FICHIER="/backups/enquete_$DATE.dump" backup sh -c 'pg_restore --clean --if-exists --no-owner -d "${DATABASE_URL:-$PGDATABASE}" "$FICHIER"' \
   || echo "  (pg_restore a signalé des avertissements : vérifiez l'application après redémarrage)"
 echo "== Pièces jointes"
 if $COMPOSE exec -T backup test -f "/backups/pieces_$DATE.tar.gz"; then

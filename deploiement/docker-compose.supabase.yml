@@ -1,0 +1,33 @@
+# Surcouche base de données Supabase : PostgreSQL hébergé par Supabase au lieu du conteneur « db » local.
+# Se combine avec la publication choisie, par exemple :
+#   docker compose -f docker-compose.yml -f deploiement/docker-compose.cloudflare.yml \
+#     -f deploiement/docker-compose.supabase.yml up -d --build
+# Prérequis : DATABASE_URL dans .env (voir docs/CLOUDFLARE.md, section Supabase). Docker Compose 2.24 ou plus récent.
+services:
+  web:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Définissez DATABASE_URL dans .env (voir docs/CLOUDFLARE.md)}
+    depends_on: !reset {}
+
+  taches:
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+
+  # Le conteneur PostgreSQL local n'est plus démarré (profil jamais activé).
+  db:
+    profiles: ["base-locale"]
+
+  # Sauvegarde quotidienne de la base Supabase (schéma « enquete ») et des pièces jointes, gardée 30 jours.
+  # Client PostgreSQL 17 : celui des projets Supabase récents.
+  backup:
+    image: postgres:17-alpine
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    entrypoint: >
+      sh -c 'while true; do
+        jour=$$(date +%Y-%m-%d_%H%M);
+        pg_dump -Fc --no-owner -n enquete "$$DATABASE_URL" > /backups/enquete_$$jour.dump &&
+        tar -czf /backups/pieces_$$jour.tar.gz -C /media . &&
+        find /backups \( -name "*.dump" -o -name "*.tar.gz" \) -mtime +30 -delete;
+        sleep 86400; done'
+    depends_on: !reset {}

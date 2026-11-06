@@ -83,7 +83,31 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-if os.environ.get("POSTGRES_HOST"):
+def _base_depuis_url(url):
+    """Base externe (Supabase ou autre PostgreSQL hébergé) : postgresql://utilisateur:mot-de-passe@hôte:port/base."""
+    from urllib.parse import parse_qs, unquote, urlsplit
+
+    u = urlsplit(url)
+    if u.scheme not in ("postgres", "postgresql"):
+        raise RuntimeError("DATABASE_URL doit commencer par postgresql://")
+    options = {k: v[-1] for k, v in parse_qs(u.query).items()}
+    options.setdefault("sslmode", "require")  # chiffrement obligatoire vers une base distante
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "HOST": u.hostname or "",
+        "PORT": str(u.port or 5432),
+        "NAME": unquote(u.path.lstrip("/")) or "postgres",
+        "USER": unquote(u.username or ""),
+        "PASSWORD": unquote(u.password or ""),
+        "OPTIONS": options,
+        "CONN_MAX_AGE": 60,
+        "CONN_HEALTH_CHECKS": True,
+    }
+
+
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {"default": _base_depuis_url(os.environ["DATABASE_URL"])}
+elif os.environ.get("POSTGRES_HOST"):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
