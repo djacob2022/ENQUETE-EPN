@@ -74,6 +74,37 @@ docker compose -f docker-compose.yml -f deploiement/docker-compose.cloudflare.ym
 - **Caching** : laissez le réglage standard. Cloudflare ne met en cache que les fichiers statiques (`/static/…`) ; les pages et l'API ne le sont jamais.
 - **Security** → **WAF** (facultatif) : une règle de limitation de débit sur `/api/auth/connexion/` renforce le blocage déjà fait par l'application après 5 échecs.
 
+## Option : base de données chez Supabase
+
+Par défaut, la base PostgreSQL tourne dans un conteneur sur la machine. Avec Supabase, elle est hébergée et sauvegardée par Supabase : les données ne dépendent plus de la machine. Le projet `enquete-epn` (région Paris, `eu-west-3`) est déjà créé, avec :
+
+- un compte réservé à l'application, `enquete_app`, sans aucun autre droit ;
+- un schéma `enquete` que l'API publique de Supabase n'expose pas : les rôles `anon` et `authenticated` n'y ont aucun accès.
+
+1. Dans Supabase, ouvrez le projet **enquete-epn** → **SQL Editor**, et exécutez (en choisissant un mot de passe long, sans `@` ni `/`) :
+
+   ```sql
+   alter role enquete_app with password 'VOTRE-MOT-DE-PASSE';
+   ```
+
+2. Cliquez sur **Connect** (en haut de la page du projet), onglet **Session pooler**, et notez l'hôte, du type `aws-0-eu-west-3.pooler.supabase.com`. Le pooler est nécessaire : l'adresse directe de la base n'est joignable qu'en IPv6.
+
+3. Dans `.env`, ajoutez (l'utilisateur est `enquete_app.` suivi de l'identifiant du projet) :
+
+   ```
+   DATABASE_URL=postgresql://enquete_app.pdikhxvedaaeoeykforu:VOTRE-MOT-DE-PASSE@aws-0-eu-west-3.pooler.supabase.com:5432/postgres
+   ```
+
+4. Démarrez avec les deux surcouches :
+
+   ```bash
+   docker compose -f docker-compose.yml -f deploiement/docker-compose.cloudflare.yml -f deploiement/docker-compose.supabase.yml up -d --build
+   ```
+
+Les tables sont créées au premier démarrage. Les scripts `mettre-a-jour.sh` et `restaurer.sh` détectent `DATABASE_URL` et ajoutent la surcouche Supabase d'eux-mêmes. La sauvegarde quotidienne copie alors la base Supabase sur la machine, en plus des sauvegardes de Supabase.
+
+À vérifier avec le maître d'ouvrage : la section 7 du cahier des charges demande un hébergement des données sur le territoire national ou chez un hébergeur agréé. Supabase héberge ici les données en France (Union européenne).
+
 ## Mettre à jour, sauvegarder, restaurer
 
 Les scripts détectent le jeton dans `.env` et utilisent automatiquement la surcouche Cloudflare :

@@ -9,9 +9,13 @@ if grep -q '^CLOUDFLARE_TUNNEL_TOKEN=..' .env 2>/dev/null; then
 else
   COMPOSE="docker compose -f docker-compose.yml -f deploiement/docker-compose.prod.yml"
 fi
+# Base hébergée (Supabase) si DATABASE_URL est réglé dans .env.
+if grep -q '^DATABASE_URL=..' .env 2>/dev/null; then
+  COMPOSE="$COMPOSE -f deploiement/docker-compose.supabase.yml"
+fi
 
 echo "== Sauvegarde de précaution"
-$COMPOSE exec -T backup sh -c 'jour=avant-maj_$(date +%Y-%m-%d_%H%M); pg_dump -Fc > /backups/enquete_$jour.dump && tar -czf /backups/pieces_$jour.tar.gz -C /media . && echo "  /backups/enquete_$jour.dump"'
+$COMPOSE exec -T backup sh -c 'jour=avant-maj_$(date +%Y-%m-%d_%H%M); pg_dump -Fc ${DATABASE_URL:+--no-owner -n enquete "$DATABASE_URL"} > /backups/enquete_$jour.dump && tar -czf /backups/pieces_$jour.tar.gz -C /media . && echo "  /backups/enquete_$jour.dump"'
 
 echo "== Récupération du code"
 git pull --ff-only
