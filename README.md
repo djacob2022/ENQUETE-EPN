@@ -171,5 +171,6 @@ Menu **Répertoire des EPN** → fichier `.xlsx` avec, dans cet ordre : Dénomin
 
 - `docs/Cahier_des_charges_ENQUETE-EPN.docx` : cahier des charges.
 - `docs/CONFORMITE.md` : matrice de conformité au cahier des charges (F-01 à F-50, sections 3, 4, 7 et 8).
-- `docs/MISE_EN_LIGNE.md` : mise en ligne sur un serveur.
+- `docs/MISE_EN_LIGNE.md` : mise en ligne sur un serveur (HTTPS par Caddy).
+- `docs/CLOUDFLARE.md` : publication par Cloudflare Tunnel, sans ouvrir de port.
 - Aide en ligne et FAQ pour les établissements et l'équipe : page `/aide` de l'application.

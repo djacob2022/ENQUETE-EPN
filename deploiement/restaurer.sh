@@ -4,7 +4,12 @@
 #   sudo sh deploiement/restaurer.sh 2026-11-03_0200      → restaure celle de cette date
 set -eu
 cd "$(dirname "$0")/.."
-COMPOSE="docker compose -f docker-compose.yml -f deploiement/docker-compose.prod.yml"
+# Publication par Cloudflare Tunnel si un jeton est réglé dans .env, sinon par Caddy (HTTPS direct).
+if grep -q '^CLOUDFLARE_TUNNEL_TOKEN=..' .env 2>/dev/null; then
+  COMPOSE="docker compose -f docker-compose.yml -f deploiement/docker-compose.cloudflare.yml"
+else
+  COMPOSE="docker compose -f docker-compose.yml -f deploiement/docker-compose.prod.yml"
+fi
 
 if [ $# -eq 0 ]; then
   echo "Sauvegardes disponibles :"

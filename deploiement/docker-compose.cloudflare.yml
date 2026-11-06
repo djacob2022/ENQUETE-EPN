@@ -1,0 +1,30 @@
+# Surcouche Cloudflare Tunnel : l'application est publiée par Cloudflare (HTTPS, protection DDoS),
+# sans ouvrir aucun port sur la machine. À utiliser à la place de docker-compose.prod.yml (Caddy).
+#   docker compose -f docker-compose.yml -f deploiement/docker-compose.cloudflare.yml up -d --build
+# Prérequis : CLOUDFLARE_TUNNEL_TOKEN dans .env (voir docs/CLOUDFLARE.md).
+services:
+  web:
+    environment:
+      # Imposés en production, quel que soit le contenu de .env.
+      DJANGO_DEBUG: "0"
+      COOKIES_SECURE: "1"
+      REDIRECTION_HTTPS: "1"
+      # Le connecteur cloudflared est le seul proxy devant l'application : l'adresse réelle du visiteur
+      # est la dernière de X-Forwarded-For (ajoutée par Cloudflare).
+      NB_PROXYS_DE_CONFIANCE: "1"
+      CHARGER_DONNEES_DEMO: "0"
+
+  taches:
+    environment:
+      DJANGO_DEBUG: "0"
+
+  # Connecteur Cloudflare : ouvre une connexion sortante vers Cloudflare et lui relaie les visites.
+  cloudflared:
+    image: cloudflare/cloudflared:2024.12.2
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Définissez CLOUDFLARE_TUNNEL_TOKEN dans .env (voir docs/CLOUDFLARE.md)}
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
