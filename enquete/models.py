@@ -465,3 +465,47 @@ class Parametres(models.Model):
         """Valeur réglée dans l'interface, à défaut celle du fichier .env."""
         repli = {"pays": "PAYS", "devise": "DEVISE", "ministere": "NOM_MINISTERE", "institution": "NOM_INSTITUTION"}
         return getattr(self, champ) or (getattr(settings, repli[champ], "") if champ in repli else "")
+
+
+class DoubleAuthentification(models.Model):
+    """Double authentification d'un compte de l'équipe (F-03) : application TOTP et codes de secours."""
+
+    utilisateur = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="double_auth")
+    secret = models.CharField(max_length=64)
+    active = models.BooleanField(default=False)
+    dernier_pas = models.BigIntegerField(null=True, blank=True, help_text="Dernier code accepté : refusé s'il est rejoué.")
+    codes_secours = models.JSONField(default=list, blank=True, help_text="Empreintes des codes de secours restants.")
+    date_activation = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "double authentification"
+
+    def __str__(self):
+        return f"{self.utilisateur} · {'active' if self.active else 'en cours'}"
+
+    @staticmethod
+    def empreinte(code):
+        import hashlib
+
+        return hashlib.sha256(code.strip().upper().replace(" ", "").encode()).hexdigest()
+
+    def verifier(self, code):
+        """Code de l'application ou code de secours (consommé). Enregistre le pas accepté."""
+        from . import totp
+
+        pas = totp.verifier(self.secret, code, self.dernier_pas)
+        if pas is not None:
+            self.dernier_pas = pas
+            self.save(update_fields=["dernier_pas"])
+            return True
+        e = self.empreinte(code)
+        if self.active and e in self.codes_secours:
+            self.codes_secours = [c for c in self.codes_secours if c != e]
+            self.save(update_fields=["codes_secours"])
+            return True
+        return False
+
+
+def double_auth_active(user):
+    da = getattr(user, "double_auth", None)
+    return bool(da and da.active)

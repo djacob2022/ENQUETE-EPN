@@ -179,3 +179,36 @@ def variables_croisables(questionnaire):
         if q["type"] in QUALITATIFS:
             sortie.append({"valeur": q["code"], "libelle": f"{q['code']} · {q['libelle']}", "groupe": m["titre"]})
     return sortie
+
+
+def bornes_atypiques(questionnaire, reponses, k=3.0, minimum=5):
+    """Valeurs atypiques au sein d'une campagne (F-32) : hors de [Q1 − k·IQR ; Q3 + k·IQR] (règle de Tukey).
+
+    Calculées seulement à partir de `minimum` réponses : en dessous, les quartiles ne veulent rien dire.
+    """
+    bornes = {}
+    for _, q in questionnaire.questions():
+        if q["type"] not in TYPES_NUMERIQUES or q.get("annee"):
+            continue
+        valeurs = sorted(v for r in reponses if isinstance(v := r.donnees.get(q["code"]), (int, float))
+                         and not isinstance(v, bool))
+        if len(valeurs) < minimum:
+            continue
+        q1, q3 = _quartiles(valeurs)
+        ecart = q3 - q1
+        if ecart > 0:
+            bornes[q["code"]] = (q1 - k * ecart, q3 + k * ecart)
+    return bornes
+
+
+def valeurs_atypiques(questionnaire, reponses):
+    bornes = bornes_atypiques(questionnaire, reponses)
+    sortie = []
+    for r in reponses:
+        for code, (bas, haut) in bornes.items():
+            v = r.donnees.get(code)
+            if isinstance(v, (int, float)) and not isinstance(v, bool) and not bas <= v <= haut:
+                q = questionnaire.question(code)
+                sortie.append({"reponse": r.pk, "epn": r.epn.nom, "code": code, "libelle": q["libelle"], "valeur": v,
+                               "bas": bas, "haut": haut, "sens": "haut" if v > haut else "bas"})
+    return sorted(sortie, key=lambda x: (x["code"], x["epn"]))

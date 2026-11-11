@@ -213,6 +213,7 @@ function DetailReponse({ id }: { id: number }) {
             {peut(moi, "valider") && <Bouton taille="sm" variante="fantome" icone={<CalendarClock className="h-3.5 w-3.5" />} onClick={() => setProlonger(r.date_limite ?? "")}>Prolonger le délai</Bouton>}
           </>}
           {peut(moi, "exporter") && <a href={r.export_url} className="inline-flex h-9 items-center gap-2 rounded-[10px] border border-trait px-3 text-[13px] font-medium hover:bg-relief"><FileSpreadsheet className="h-3.5 w-3.5" /> Excel</a>}
+          <a href={r.pdf_url} className="inline-flex h-9 items-center gap-2 rounded-[10px] border border-trait px-3 text-[13px] font-medium hover:bg-relief"><FileText className="h-3.5 w-3.5" /> PDF</a>
           {peut(moi, "gerer_liens") && <>
             <Bouton taille="sm" icone={copie ? <Check className="h-3.5 w-3.5 text-succes" /> : <Copy className="h-3.5 w-3.5" />} onClick={copierLien}>{copie ? "Lien copié" : "Copier le lien"}</Bouton>
             <a href={r.lien} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-2 rounded-[10px] px-3 text-[13px] font-medium text-discret hover:bg-relief hover:text-encre"><ExternalLink className="h-3.5 w-3.5" /> Ouvrir le formulaire</a>
@@ -251,7 +252,7 @@ function DetailReponse({ id }: { id: number }) {
       <div className="space-y-4 p-6">
         {onglet === "reponses" && r.exercice_precedent && (
           <p className="flex items-center gap-2 text-xs text-discret"><TriangleAlert className="h-3.5 w-3.5 text-alerte" />
-            Comparaison avec l'exercice {r.exercice_precedent} : les écarts de plus de 50 % sont signalés.</p>
+            Comparaison avec l'exercice {r.exercice_precedent} : les écarts de plus de 50 % sont signalés, ainsi que les valeurs atypiques par rapport aux autres établissements.</p>
         )}
         {onglet === "reponses" && r.modules.map((m) => (
           <Carte key={m.code} className="overflow-hidden">
@@ -262,11 +263,17 @@ function DetailReponse({ id }: { id: number }) {
             </div>
             <dl className="divide-y divide-trait">
               {m.lignes.map((l) => (
-                <div key={l.code} className={cx("px-5 py-2.5 text-sm", l.anomalie && "bg-alerte-doux/50")}>
+                <div key={l.code} className={cx("px-5 py-2.5 text-sm", (l.anomalie || l.atypique) && "bg-alerte-doux/50")}>
                   <div className="grid gap-1 sm:grid-cols-[1fr_1fr] sm:gap-4">
                     <dt className="text-discret"><span className="mr-1.5 font-mono text-[11px]">{l.code}</span>{l.libelle}</dt>
                     <dd className={cx("font-medium", !l.valeur && "font-normal text-discret/60")}>
                       {l.piece ? <a href={l.piece.url} className="inline-flex items-center gap-1.5 text-marque hover:underline"><FileText className="h-3.5 w-3.5" />{l.piece.nom}</a> : l.valeur || "—"}
+                      {l.atypique && (
+                        <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-alerte-doux px-1.5 py-0.5 text-[11px] font-semibold text-alerte"
+                          title="Très éloignée des valeurs des autres établissements de la campagne (règle de Tukey)">
+                          <TriangleAlert className="h-3 w-3" /> Atypique ({l.atypique === "haut" ? "très élevée" : "très basse"})
+                        </span>
+                      )}
                       {l.precedent !== undefined && (
                         <span className={cx("ml-2 text-xs font-normal", l.anomalie ? "font-medium text-alerte" : "text-discret")}>
                           N-1 : {l.precedent}{l.ecart !== undefined && ` (${l.ecart > 0 ? "+" : ""}${l.ecart} %)`}

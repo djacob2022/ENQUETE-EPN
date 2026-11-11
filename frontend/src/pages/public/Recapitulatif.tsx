@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, CircleAlert, FileText, PenLine, Printer, Send } from "lucide-react";
+import { Check, CircleAlert, FileDown, FileText, PenLine, Printer, Send } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BoutonTheme from "@/composants/BoutonTheme";
@@ -111,7 +111,8 @@ export function Recapitulatif() {
           </span>
         </label>
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-discret">Un accusé de réception sera envoyé à {id.email}.</p>
+          <p className="text-xs text-discret">Un accusé de réception, avec le récapitulatif en PDF, sera envoyé à {id.email}.
+            {" "}<a href={urlApi(jeton, "recapitulatif.pdf")} className="font-medium text-marque hover:underline">Aperçu du PDF</a></p>
           <Bouton variante="primaire" taille="lg" disabled={!certifie || manquants.length > 0} chargement={envoi} onClick={envoyer}>
             <Send className="h-4 w-4" /> Envoyer mes réponses
           </Bouton>
@@ -122,7 +123,7 @@ export function Recapitulatif() {
 }
 
 export function Merci() {
-  const { reponse } = useFormulaire();
+  const { reponse, jeton } = useFormulaire();
   return (
     <div className="min-h-screen">
       <BandeauOfficiel droite={<span className="pas-imprimer"><BoutonTheme /></span>} />
@@ -142,8 +143,10 @@ export function Merci() {
             Les réponses de <strong className="text-encre">{reponse.epn.nom}</strong> ont été reçues le {date(reponse.date_soumission, true)}.
             Un accusé de réception a été envoyé à {reponse.identification.email}.
           </p>
-          <div className="pas-imprimer relative mt-8 flex justify-center">
-            <Bouton onClick={() => window.print()}><Printer className="h-4 w-4" /> Imprimer le récapitulatif</Bouton>
+          <div className="pas-imprimer relative mt-8 flex flex-wrap justify-center gap-2">
+            <a href={urlApi(jeton, "recapitulatif.pdf")} className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-marque px-4 text-sm font-medium text-white shadow-sm hover:bg-marque-fonce dark:text-[#04140c]">
+              <FileDown className="h-4 w-4" /> Télécharger le récapitulatif (PDF)</a>
+            <Bouton onClick={() => window.print()}><Printer className="h-4 w-4" /> Imprimer</Bouton>
           </div>
         </motion.div>
         <h2 className="mb-4 mt-12 text-lg font-semibold tracking-tight">Récapitulatif de vos réponses</h2>

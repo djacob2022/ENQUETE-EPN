@@ -14,6 +14,7 @@ import { Avatar, Bouton, cx, Kbd, Logo, Squelette } from "@/ui";
 import Campagnes from "./Campagnes";
 import Comptes from "./Comptes";
 import Journal from "./Journal";
+import MonCompte from "./MonCompte";
 import Parametres from "./Parametres";
 import Liens from "./Liens";
 import QuestionnaireApercu from "./QuestionnaireApercu";
@@ -91,6 +92,7 @@ export default function Gestion() {
           <Route path="comptes" element={<Comptes />} />
           <Route path="journal" element={<Journal />} />
           <Route path="parametres" element={<Parametres />} />
+          <Route path="compte" element={<MonCompte />} />
           <Route path="*" element={<Navigate to="/gestion" replace />} />
         </Routes>
       </Coque>
@@ -160,12 +162,12 @@ function Coque({ children }: { children: React.ReactNode }) {
       <div className="m-3 rounded-xl border border-trait p-3">
         <div className="flex items-center gap-3">
           <Avatar texte={initiales(moi.nom)} />
-          <div className="min-w-0 flex-1">
+          <NavLink to="/gestion/compte" className="min-w-0 flex-1 rounded-md hover:text-marque" title="Mon compte">
             <p className="truncate text-sm font-medium">{moi.nom}</p>
             <p className="truncate text-xs text-discret" title={moi.perimetre?.join(", ")}>
               {moi.role_libelle}{moi.perimetre ? ` · ${moi.perimetre.join(", ")}` : ""}
             </p>
-          </div>
+          </NavLink>
         </div>
         <div className="mt-2 flex items-center justify-between border-t border-trait pt-2">
           <Cloche />

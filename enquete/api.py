@@ -18,13 +18,14 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from . import editeur, export_excel, securite, serializers, services, statistiques
+from . import editeur, export_excel, modele_excel, pdf, securite, serializers, services, statistiques
 from .emails import (envoyer_acces, envoyer_correction, envoyer_invitation, envoyer_lien_mot_de_passe,
                      envoyer_nouveau_lien, envoyer_relance, envoyer_validation)
 from .forms import CampagneForm, EPNForm, IdentificationForm, ImportEPNForm
 from .journal import LIBELLES, tracer
-from .models import (EPN, Campagne, Envoi, Journal, ListeReference, Parametres, PieceJointe, ProfilEquipe, Reponse,
-                     lien_public, permissions_de, role_de, tutelles_autorisees)
+from .models import (EPN, Campagne, DoubleAuthentification, EchecConnexion, Envoi, Journal, ListeReference, Parametres,
+                     PieceJointe, ProfilEquipe, Reponse, double_auth_active, lien_public, permissions_de, role_de,
+                     tutelles_autorisees)
 from .services import Refus
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -263,6 +264,42 @@ def piece_publique(request, jeton, code):
     return JsonResponse(serializers.reponse_publique(r))
 
 
+@require_GET
+@api
+def modele_xlsx(request, jeton):
+    """F-26 : questionnaire à remplir hors ligne, prérempli avec les réponses déjà saisies."""
+    r = _reponse(jeton)
+    services.exiger_saisie_possible(r)
+    from django.utils.text import get_valid_filename
+
+    return telechargement(modele_excel.generer(r), XLSX,
+                          f"Questionnaire_{get_valid_filename(r.epn.sigle or r.epn.nom)}_{r.campagne.exercice}.xlsx")
+
+
+@require_POST
+@api
+def import_xlsx(request, jeton):
+    r = _reponse(jeton)
+    services.exiger_saisie_possible(r)
+    if "fichier" not in request.FILES:
+        raise Refus("Aucun fichier reçu.")
+    nombre, erreurs, modules = modele_excel.importer(r, request.FILES["fichier"])
+    tracer(request, "import_excel", r.epn.nom, auteur=_repondant(r), valeurs=nombre, erreurs=len(erreurs),
+           **_detail_reponse(r))
+    return JsonResponse({"valeurs": nombre, "rubriques": modules, "erreurs": erreurs,
+                         "reponse": serializers.reponse_publique(r)})
+
+
+@require_GET
+@api
+def recapitulatif_pdf(request, jeton):
+    """F-27 : récapitulatif officiel en PDF, pour le détenteur du lien."""
+    r = _reponse(jeton)
+    if not r.nom:
+        raise Refus("Renseignez d'abord vos coordonnées.", 409)
+    return telechargement(pdf.recapitulatif(r), "application/pdf", pdf.nom_fichier(r))
+
+
 @require_POST
 @api
 def soumettre(request, jeton):
@@ -283,7 +320,8 @@ def _moi(user):
     return {"identifiant": user.get_username(), "nom": user.get_full_name() or user.get_username(),
             "email": user.email, "superutilisateur": user.is_superuser, "perimetre": perimetre,
             "administrateur": "gerer_campagnes" in perms, "role": role, "role_libelle": libelles.get(role, role),
-            "permissions": sorted(perms), "session_minutes": settings.SESSION_COOKIE_AGE // 60}
+            "permissions": sorted(perms), "session_minutes": settings.SESSION_COOKIE_AGE // 60,
+            "deux_facteurs": double_auth_active(user)}
 
 
 @require_GET
@@ -315,9 +353,78 @@ def connexion(request):
     if user is None or not user.is_staff:
         tracer(request, "connexion_echec", identifiant, auteur=identifiant)
         raise Refus("Identifiant ou mot de passe incorrect.", 401)
+    if double_auth_active(user):
+        # Mot de passe correct : la session n'est ouverte qu'après le code de l'application (F-03).
+        request.session["deux_facteurs_attente"] = {"id": user.pk, "expire": (timezone.now() + timedelta(minutes=5)).isoformat()}
+        return JsonResponse({"deux_facteurs": True})
     login(request, user)
     tracer(request, "connexion", user.get_username())
     return JsonResponse(_moi(user))
+
+
+@require_POST
+@api
+def verification_deux_facteurs(request):
+    """Deuxième étape de la connexion : code à 6 chiffres de l'application, ou code de secours."""
+    attente = request.session.get("deux_facteurs_attente") or {}
+    try:
+        expire = timezone.datetime.fromisoformat(attente.get("expire", ""))
+    except ValueError:
+        expire = None
+    user = User.objects.filter(pk=attente.get("id"), is_active=True, is_staff=True).first() if attente else None
+    if user is None or expire is None or expire < timezone.now():
+        request.session.pop("deux_facteurs_attente", None)
+        raise Refus("Délai dépassé : saisissez à nouveau votre mot de passe.", 401)
+    if securite.connexion_bloquee(user.get_username(), request):
+        raise Refus("Trop de tentatives de connexion. Pour protéger le compte, réessayez dans 15 minutes.", 429)
+    if not user.double_auth.verifier(str(_corps(request).get("code", ""))):
+        EchecConnexion.objects.create(identifiant=user.get_username(), ip=securite.ip_client(request))
+        tracer(request, "connexion_echec", user.get_username(), auteur=user.get_username(), etape="code")
+        raise Refus("Code incorrect ou expiré.", 401)
+    request.session.pop("deux_facteurs_attente", None)
+    login(request, user, backend="enquete.securite.AuthentificationProtegee")
+    tracer(request, "connexion", user.get_username(), deux_facteurs=True)
+    return JsonResponse(_moi(user))
+
+
+@require_http_methods(["GET", "POST", "DELETE"])
+@equipe
+def deux_facteurs(request):
+    """Mise en place (POST sans code), activation (POST avec code) ou désactivation (DELETE) de la double
+    authentification du compte connecté."""
+    from . import totp
+
+    user = request.user
+    da = getattr(user, "double_auth", None)
+    if request.method == "GET":
+        return JsonResponse({"active": bool(da and da.active), "codes_restants": len(da.codes_secours) if da else 0})
+    corps = _corps(request)
+    if request.method == "DELETE":
+        if not user.check_password(str(corps.get("mot_de_passe", ""))):
+            raise Refus("Mot de passe incorrect.", 403)
+        if da:
+            da.delete()
+        tracer(request, "deux_facteurs", user.get_username(), desactivation=True)
+        return JsonResponse({"active": False, "codes_restants": 0})
+    if not corps.get("code"):
+        if da and da.active:
+            raise Refus("La double authentification est déjà active.")
+        secret = totp.nouveau_secret()
+        DoubleAuthentification.objects.update_or_create(utilisateur=user, defaults={
+            "secret": secret, "active": False, "dernier_pas": None, "codes_secours": []})
+        adresse = totp.uri(secret, user.email or user.get_username())
+        return JsonResponse({"secret": secret, "uri": adresse, "qr_svg": totp.qr_svg(adresse)})
+    if not da or da.active:
+        raise Refus("Commencez par afficher le QR code.")
+    if not da.verifier(str(corps["code"])):
+        raise Refus("Code incorrect : vérifiez l'heure de votre téléphone et réessayez.")
+    codes = totp.codes_de_secours()
+    da.active = True
+    da.date_activation = timezone.now()
+    da.codes_secours = [DoubleAuthentification.empreinte(c) for c in codes]
+    da.save()
+    tracer(request, "deux_facteurs", user.get_username(), activation=True)
+    return JsonResponse({"active": True, "codes_restants": len(codes), "codes_secours": codes})
 
 
 @require_POST
@@ -485,6 +592,15 @@ def reponse_detail(request, pk):
     _exiger(request, "voir_nominatif")
     r = _reponse_perimetre(request, pk)
     return JsonResponse(serializers.reponse_detail(r))
+
+
+@require_GET
+@equipe
+def reponse_pdf(request, pk):
+    _exiger(request, "voir_nominatif")
+    r = _reponse_perimetre(request, pk)
+    tracer(request, "export", f"Récapitulatif de {r.epn.nom}", format="pdf", **_detail_reponse(r))
+    return telechargement(pdf.recapitulatif(r), "application/pdf", pdf.nom_fichier(r))
 
 
 @require_GET
@@ -663,6 +779,7 @@ def stats(request):
                        "indicateurs": statistiques.indicateurs(rep_prec)} if precedente else None,
         "historique": services.historique(tutelles_autorisees(request.user)),
         "variables": statistiques.variables_croisables(c.q),
+        "atypiques": statistiques.valeurs_atypiques(c.q, rep) if "voir_nominatif" in permissions_de(request.user) else [],
     })
 
 
@@ -880,7 +997,7 @@ def _compte(u):
             "actif": u.is_active, "superutilisateur": u.is_superuser, "role": role_de(u),
             "tutelles": profil.liste_tutelles if profil else [],
             "derniere_connexion": u.last_login.isoformat() if u.last_login else None,
-            "mot_de_passe_defini": u.has_usable_password()}
+            "mot_de_passe_defini": u.has_usable_password(), "deux_facteurs": double_auth_active(u)}
 
 
 def _appliquer_compte(u, corps, createur):
@@ -934,6 +1051,10 @@ def comptes(request):
 def compte(request, pk):
     _exiger(request, "gerer_comptes")
     u = get_object_or_404(User, pk=pk, is_staff=True)
+    if request.method == "POST" and _corps(request).get("action") == "reinitialiser_2fa":
+        DoubleAuthentification.objects.filter(utilisateur=u).delete()
+        tracer(request, "deux_facteurs", u.get_username(), reinitialisation=True)
+        return JsonResponse(_compte(u))
     if request.method == "POST":  # renvoyer le lien de (ré)initialisation
         ok = envoyer_lien_mot_de_passe(u, lien_mot_de_passe(u), nouveau_compte=not u.has_usable_password())
         tracer(request, "compte", u.get_username(), lien_envoye=ok)
@@ -1007,3 +1128,38 @@ def parametres(request):
         p.save()
         tracer(request, "parametres", "Paramètres de l'application", champs=[c for c in CHAMPS_PARAMETRES if c in donnees])
     return JsonResponse(_parametres(p))
+
+
+# --- Sauvegarde et restauration (F-49) : super-administrateur seulement ------------------------------
+
+def _exiger_super(request):
+    if not request.user.is_superuser:
+        raise Refus("Réservé au super-administrateur.", 403)
+
+
+@require_GET
+@equipe
+def sauvegarde_zip(request):
+    from . import sauvegarde
+
+    _exiger_super(request)
+    contenu = sauvegarde.creer()
+    tracer(request, "sauvegarde", "Sauvegarde complète téléchargée", taille=len(contenu))
+    return telechargement(contenu, "application/zip", f"sauvegarde_enquete_epn_{timezone.localtime():%Y-%m-%d_%H%M}.zip")
+
+
+@require_POST
+@equipe
+def restauration(request):
+    from . import sauvegarde
+
+    _exiger_super(request)
+    if request.POST.get("confirmation") != "RESTAURER":
+        raise Refus("Tapez RESTAURER pour confirmer : toutes les données actuelles seront remplacées.")
+    if "fichier" not in request.FILES:
+        raise Refus("Aucun fichier reçu.")
+    auteur = request.user.get_username()
+    resultat = sauvegarde.restaurer(request.FILES["fichier"])
+    tracer(request, "restauration", "Données restaurées depuis une sauvegarde", auteur=auteur, **resultat)
+    logout(request)  # les sessions ont été effacées avec les données : reconnexion nécessaire
+    return JsonResponse({"ok": True} | resultat)

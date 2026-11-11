@@ -32,5 +32,6 @@ LIBELLES = {
     "relance": "Relance", "relance_auto": "Relance automatique", "invitation": "Invitation",
     "nouveau_lien": "Lien remplacé", "campagne": "Campagne", "questionnaire": "Questionnaire modifié",
     "epn": "Fiche EPN", "import_epn": "Import du répertoire", "reference": "Liste de référence",
-    "compte": "Compte", "parametres": "Paramètres", "preremplissage": "Pré-remplissage",
+    "compte": "Compte", "deux_facteurs": "Double authentification", "sauvegarde": "Sauvegarde",
+    "restauration": "Restauration", "import_excel": "Import Excel", "parametres": "Paramètres", "preremplissage": "Pré-remplissage",
 }

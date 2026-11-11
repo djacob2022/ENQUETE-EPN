@@ -2,7 +2,7 @@
 import logging
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage, send_mail
 from django.template.loader import render_to_string
 from django.utils import timezone
 
@@ -25,18 +25,17 @@ def _contexte():
             "texte_relance": p.texte_relance, "signature": p.signature, "assistance": p.email_contact}
 
 
-def _envoyer(reponse, type_envoi, gabarit, sujet, par="", destinataires=None, **extra):
+def _envoyer(reponse, type_envoi, gabarit, sujet, par="", destinataires=None, joindre=None, **extra):
     contexte = _contexte() | {"reponse": reponse, "campagne": reponse.campagne,
                               "date_limite": reponse.date_limite_effective} | extra
     destinataires = destinataires or _destinataires(reponse)
     envoi = Envoi(reponse=reponse, type=type_envoi, destinataires=", ".join(destinataires), par=par)
     try:
-        send_mail(
-            sujet,
-            render_to_string(f"enquete/emails/{gabarit}.txt", contexte),
-            settings.DEFAULT_FROM_EMAIL,
-            destinataires,
-        )
+        message = EmailMessage(sujet, render_to_string(f"enquete/emails/{gabarit}.txt", contexte),
+                               settings.DEFAULT_FROM_EMAIL, destinataires)
+        for nom, contenu, type_mime in (joindre or []):
+            message.attach(nom, contenu, type_mime)
+        message.send()
     except Exception as exc:  # SMTP indisponible, adresse refusée…
         logger.exception("Échec d'envoi %s pour %s", type_envoi, reponse)
         envoi.succes = False
@@ -86,8 +85,16 @@ def envoyer_relance(reponse, par=""):
 
 
 def envoyer_accuse(reponse):
+    """Accusé de réception, avec le récapitulatif officiel en PDF (F-27)."""
+    joindre = []
+    try:
+        from . import pdf
+
+        joindre.append((pdf.nom_fichier(reponse), pdf.recapitulatif(reponse), "application/pdf"))
+    except Exception:  # le PDF ne doit jamais empêcher l'accusé de partir
+        logger.exception("Récapitulatif PDF impossible pour %s", reponse)
     return _envoyer(reponse, Envoi.Type.ACCUSE, "accuse",
-                    f"Accusé de réception – [{reponse.campagne}] {reponse.epn.nom}")
+                    f"Accusé de réception – [{reponse.campagne}] {reponse.epn.nom}", joindre=joindre)
 
 
 def envoyer_correction(reponse, par=""):

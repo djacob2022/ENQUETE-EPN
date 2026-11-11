@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Pencil, Plus, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { KeyRound, Pencil, Plus, ShieldCheck, ShieldOff, UserRound, UsersRound } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { api, ErreurApi } from "@/lib/api";
 import { copier } from "@/lib/presse-papiers";
@@ -49,6 +49,12 @@ export default function Comptes() {
     onError: (e: ErreurApi) => toast("erreur", e.message),
   });
 
+  const reinit = useMutation({
+    mutationFn: (id: number) => api.post<Compte>(`/api/gestion/comptes/${id}/`, { action: "reinitialiser_2fa" }),
+    onSuccess: (c) => { client.invalidateQueries({ queryKey: ["comptes"] }); toast("succes", `Double authentification de ${c.email} réinitialisée.`); },
+    onError: (e: ErreurApi) => toast("erreur", e.message),
+  });
+
   const soumettre = (e: FormEvent) => { e.preventDefault(); if (edition) enregistrer.mutate(edition); };
   const maj = (p: Partial<Brouillon>) => setEdition((b) => b && { ...b, ...p });
 
@@ -85,13 +91,16 @@ export default function Comptes() {
                     </div>
                   </td>
                   <td className="px-4 py-3"><Badge ton={c.role === "lecteur" ? "neutre" : "marque"}>{libelleRole(c.role)}</Badge>
-                    {!c.actif && <Badge ton="danger">Désactivé</Badge>}{!c.mot_de_passe_defini && c.actif && <Badge ton="alerte">À activer</Badge>}</td>
+                    {!c.actif && <Badge ton="danger">Désactivé</Badge>}{!c.mot_de_passe_defini && c.actif && <Badge ton="alerte">À activer</Badge>}
+                    {c.deux_facteurs && <Badge ton="succes"><ShieldCheck className="h-3 w-3" /> 2FA</Badge>}</td>
                   <td className="px-4 py-3 text-discret">{c.tutelles.length ? c.tutelles.join(", ") : "Tous les EPN"}</td>
                   <td className="px-4 py-3 text-discret">{c.derniere_connexion ? ilYa(c.derniere_connexion) : "Jamais"}</td>
                   <td className="px-4 py-3 pr-6 text-right">
                     {(!c.superutilisateur || moi.superutilisateur) && <div className="flex justify-end gap-1">
                       <Bouton taille="sm" variante="fantome" icone={<KeyRound className="h-3.5 w-3.5" />} chargement={relancer.isPending && relancer.variables?.id === c.id}
                         onClick={() => relancer.mutate(c)} disabled={!c.email || !c.actif}>{c.mot_de_passe_defini ? "Réinitialiser" : "Renvoyer l'activation"}</Bouton>
+                      {c.deux_facteurs && <Bouton taille="sm" variante="fantome" icone={<ShieldOff className="h-3.5 w-3.5" />} chargement={reinit.isPending && reinit.variables === c.id}
+                        onClick={() => reinit.mutate(c.id)} title="Téléphone perdu : la personne pourra réactiver la double authentification">Réinitialiser la 2FA</Bouton>}
                       <Bouton taille="sm" variante="fantome" aria-label={`Modifier ${c.email}`} onClick={() => setEdition({ id: c.id, email: c.email, prenom: c.prenom, nom: c.nom,
                         role: c.role === "super_administrateur" ? "administrateur" : c.role, tutelles: c.tutelles, actif: c.actif })}><Pencil className="h-4 w-4" /></Bouton>
                     </div>}

@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ArrowDownRight, ArrowUpRight, BarChart3, FileSpreadsheet, Grid3x3, LineChart as IconeCourbe } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BarChart3, FileSpreadsheet, Grid3x3, LineChart as IconeCourbe, TriangleAlert } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api, avecParams } from "@/lib/api";
@@ -127,6 +128,31 @@ export default function Statistiques() {
           </div>
 
           <Croisement variables={d.variables} params={params} />
+
+          {d.atypiques.length > 0 && (
+            <Carte className="overflow-hidden">
+              <EnTeteCarte titre={<span className="flex items-center gap-2"><TriangleAlert className="h-4 w-4 text-alerte" /> Valeurs atypiques à vérifier</span>}
+                sous="Valeurs très éloignées de celles des autres établissements (au-delà de 3 écarts interquartiles). À confirmer avant validation." />
+              <div className="defilement-fin overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead className="bg-relief/50 text-left text-xs uppercase tracking-wider text-discret">
+                    <tr><th className="px-6 py-2.5 font-medium">Établissement</th><th className="px-4 py-2.5 font-medium">Question</th>
+                      <th className="px-4 py-2.5 text-right font-medium">Valeur</th><th className="px-4 py-2.5 pr-6 text-right font-medium">Plage habituelle</th></tr>
+                  </thead>
+                  <tbody className="chiffres divide-y divide-trait">
+                    {d.atypiques.map((a) => (
+                      <tr key={`${a.reponse}-${a.code}`}>
+                        <td className="px-6 py-2.5"><Link to={`/gestion/reponses?ouvrir=${a.reponse}`} className="font-medium hover:text-marque">{a.epn}</Link></td>
+                        <td className="px-4 py-2.5"><span className="mr-1.5 font-mono text-xs text-discret">{a.code}</span>{a.libelle}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-alerte">{nombre(a.valeur)} {a.sens === "haut" ? "↑" : "↓"}</td>
+                        <td className="px-4 py-2.5 pr-6 text-right text-discret">{nombre(Math.max(0, Math.round(a.bas)))} – {nombre(Math.round(a.haut))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Carte>
+          )}
 
           {d.blocs.map((b) => {
             const nums = b.questions.filter((x) => x.genre === "numerique") as { code: string; libelle: string; stats: StatNumerique; precedent?: StatNumerique }[];
