@@ -10,7 +10,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.management import call_command
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 EXCLUS = ["contenttypes", "sessions", "admin.logentry", "auth.permission", "enquete.echecconnexion",
@@ -63,7 +63,16 @@ def restaurer(fichier):
         chemin = tmp.name
     try:
         with transaction.atomic():
+            postgres = connection.vendor == "postgresql"
+            if postgres:
+                # Les contrôles de clés étrangères différés encore en attente empêchent TRUNCATE : on les exécute,
+                # puis on rétablit le report pour que loaddata puisse insérer les lignes dans n'importe quel ordre.
+                with connection.cursor() as c:
+                    c.execute("SET CONSTRAINTS ALL IMMEDIATE")
             call_command("flush", interactive=False, verbosity=0)
+            if postgres:
+                with connection.cursor() as c:
+                    c.execute("SET CONSTRAINTS ALL DEFERRED")
             call_command("loaddata", chemin, verbosity=0)
     finally:
         Path(chemin).unlink(missing_ok=True)
