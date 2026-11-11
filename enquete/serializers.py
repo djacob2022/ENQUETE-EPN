@@ -107,6 +107,9 @@ def anonymiser(resume):
 def reponse_detail(r):
     pieces = {p.code: piece_admin(p) for p in r.pieces.all()}
     precedente = reponse_precedente(r)
+    from .statistiques import bornes_atypiques
+
+    bornes = bornes_atypiques(r.campagne.q, list(r.campagne.reponses.filter(statut__in=("soumis", "en_revue", "valide"))))
     modules = []
     for m in r.campagne.q.modules:
         lignes = []
@@ -121,6 +124,11 @@ def reponse_detail(r):
                     ecart = 100 * (v - ancien) / abs(ancien)
                     ligne["ecart"] = round(ecart)
                     ligne["anomalie"] = abs(ecart) > 50
+            # Valeur atypique au sein de la campagne (F-32), par rapport aux autres établissements.
+            if q["code"] in bornes and isinstance(v, (int, float)) and not isinstance(v, bool):
+                bas, haut = bornes[q["code"]]
+                if not bas <= v <= haut:
+                    ligne["atypique"] = "haut" if v > haut else "bas"
             lignes.append(ligne)
         modules.append({"code": m["code"], "titre": m["titre"], "complet": m["code"] in r.modules_completes,
                         "lignes": lignes})
@@ -129,6 +137,7 @@ def reponse_detail(r):
         "commentaires": r.commentaires,
         "exercice_precedent": precedente.campagne.exercice if precedente else None,
         "export_url": reverse("api:reponse_export", args=[r.pk]),
+        "pdf_url": reverse("api:reponse_pdf", args=[r.pk]),
         "modules": modules,
         "pieces": list(pieces.values()),
         "zip_url": reverse("api:pieces_zip", args=[r.pk]) if pieces else None,

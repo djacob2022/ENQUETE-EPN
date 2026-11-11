@@ -1,14 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Check, CloudOff, Link2Off, Loader2, Lock, MessageSquareWarning, Send, UserRound } from "lucide-react";
-import { createContext, useContext, useMemo, useState } from "react";
+import { Check, CloudOff, Download, FileSpreadsheet, Link2Off, Loader2, Lock, MessageSquareWarning, Send, Upload, UserRound } from "lucide-react";
+import { createContext, useContext, useMemo, useRef, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import BoutonTheme from "@/composants/BoutonTheme";
 import { Embleme, useConfig } from "@/composants/Officiel";
-import { api, ErreurApi } from "@/lib/api";
+import { api, envoyerFichier, ErreurApi } from "@/lib/api";
 import { date, ilYa, joursRestants } from "@/lib/format";
 import { Questionnaire, ReponsePublique } from "@/lib/types";
-import { Anneau, cx, Squelette } from "@/ui";
+import { Anneau, Bouton, cx, Dialogue, Squelette, useToast } from "@/ui";
 import Identification from "./Identification";
 import { Merci, Recapitulatif } from "./Recapitulatif";
 import Rubrique from "./Rubrique";
@@ -147,6 +147,8 @@ function Cadre({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
+          {reponse.identifie && <HorsConnexion />}
+
           <nav aria-label="Étapes du questionnaire" className="mt-6">
             <ol className="relative space-y-1 before:absolute before:bottom-4 before:left-[19px] before:top-4 before:w-px before:bg-trait">
               <Etape to={`${base}/identification`} actif={courant === "identification"} fait={reponse.identifie} numero={<UserRound className="h-3.5 w-3.5" />}>
@@ -186,6 +188,52 @@ function Etape({ to, actif, fait, numero, children, alerte = false }: { to: stri
         {alerte && <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-danger" aria-label="Correction demandée" />}
       </Link>
     </li>
+  );
+}
+
+/** F-26 : remplir le questionnaire hors connexion dans Excel, puis le réimporter. */
+function HorsConnexion() {
+  const { jeton, mettreAJour, questionnaire } = useFormulaire();
+  const toast = useToast();
+  const champ = useRef<HTMLInputElement>(null);
+  const [progres, setProgres] = useState<number | null>(null);
+  const [bilan, setBilan] = useState<{ valeurs: number; rubriques: number; erreurs: Record<string, string[]> } | null>(null);
+  async function importer(f: File) {
+    setProgres(0);
+    try {
+      const r = await envoyerFichier<{ valeurs: number; rubriques: number; erreurs: Record<string, string[]>; reponse: ReponsePublique }>(
+        urlApi(jeton, "import/"), f, setProgres);
+      mettreAJour(r.reponse);
+      setBilan(r);
+    } catch (e) {
+      toast("erreur", (e as ErreurApi).message);
+    } finally {
+      setProgres(null);
+    }
+  }
+  const libelle = (code: string) => questionnaire.modules.flatMap((m) => m.questions).find((q) => q.code === code)?.libelle ?? code;
+  return (
+    <div className="mt-4 rounded-2xl border border-trait bg-surface p-4 shadow-carte">
+      <p className="flex items-center gap-2 text-sm font-semibold"><FileSpreadsheet className="h-4 w-4 text-succes" /> Connexion difficile ?</p>
+      <p className="mt-1 text-xs leading-relaxed text-discret">Remplissez le questionnaire dans Excel, sans Internet, puis importez-le ici.</p>
+      <div className="mt-3 grid gap-2">
+        <a href={urlApi(jeton, "modele.xlsx")} className="inline-flex h-9 items-center justify-center gap-2 rounded-[10px] border border-trait text-[13px] font-medium hover:bg-relief">
+          <Download className="h-3.5 w-3.5" /> Télécharger le fichier Excel</a>
+        <input ref={champ} type="file" accept=".xlsx" className="sr-only" tabIndex={-1} aria-hidden
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) importer(f); e.target.value = ""; }} />
+        <Bouton taille="sm" icone={<Upload className="h-3.5 w-3.5" />} chargement={progres !== null} onClick={() => champ.current?.click()}>Importer le fichier rempli</Bouton>
+      </div>
+      <Dialogue ouvert={!!bilan} fermer={() => setBilan(null)} titre="Fichier importé"
+        description={bilan ? `${bilan.valeurs} réponse${bilan.valeurs > 1 ? "s" : ""} enregistrée${bilan.valeurs > 1 ? "s" : ""} en brouillon dans ${bilan.rubriques} rubrique${bilan.rubriques > 1 ? "s" : ""}. Relisez chaque rubrique avant d'envoyer.` : ""}>
+        {bilan && Object.keys(bilan.erreurs).length > 0 && (
+          <div className="rounded-xl border border-alerte/30 bg-alerte-doux p-3 text-sm">
+            <p className="font-semibold text-alerte">{Object.keys(bilan.erreurs).length} valeur(s) à corriger en ligne</p>
+            <ul className="mt-1 space-y-1">{Object.entries(bilan.erreurs).map(([c, m]) => <li key={c}><span className="font-mono text-xs">{c}</span> · {libelle(c)} : {m.join(" ")}</li>)}</ul>
+          </div>
+        )}
+        <div className="mt-4 flex justify-end"><Bouton variante="primaire" onClick={() => setBilan(null)}>Compris</Bouton></div>
+      </Dialogue>
+    </div>
   );
 }
 

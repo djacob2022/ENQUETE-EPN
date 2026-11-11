@@ -106,8 +106,11 @@ class LimiteTailleRequete:
             taille = int(request.META.get("CONTENT_LENGTH") or 0)
         except ValueError:
             taille = 0
-        if taille > settings.TAILLE_MAX_REQUETE:
-            mo = settings.TAILLE_MAX_REQUETE // (1024 * 1024)
+        # Seule la restauration d'une sauvegarde (super-administrateur) accepte un envoi plus gros.
+        maximum = (settings.TAILLE_MAX_RESTAURATION if request.path == "/api/gestion/restauration/"
+                   else settings.TAILLE_MAX_REQUETE)
+        if taille > maximum:
+            mo = maximum // (1024 * 1024)
             return JsonResponse({"erreur": f"Envoi trop volumineux : {mo} Mo maximum par envoi."}, status=413)
         return self.get_response(request)
 

@@ -112,10 +112,11 @@ export interface ReponseDetail extends ReponseResume {
   campagne: Campagne;
   modules: { code: string; titre: string; complet: boolean;
     lignes: { code: string; libelle: string; type: TypeQuestion; valeur: string; piece?: Piece | null;
-      precedent?: string; ecart?: number; anomalie?: boolean }[] }[];
+      precedent?: string; ecart?: number; anomalie?: boolean; atypique?: "haut" | "bas" }[] }[];
   commentaires: Record<string, string>;
   exercice_precedent: number | null;
   export_url: string;
+  pdf_url: string;
   pieces: Piece[];
   zip_url: string | null;
   envois: { type: string; date: string; succes: boolean; destinataires: string; par: string }[];
@@ -174,6 +175,7 @@ export interface Statistiques {
   precedente: { campagne: Campagne; n: number; indicateurs: Indicateur[] } | null;
   historique: { libelle: string; taux: number }[];
   variables: { valeur: string; libelle: string; groupe: string }[];
+  atypiques: { reponse: number; epn: string; code: string; libelle: string; valeur: number; bas: number; haut: number; sens: "haut" | "bas" }[];
 }
 
 export interface TableauCroise {
@@ -187,11 +189,12 @@ export type Permission = "voir_nominatif" | "exporter" | "valider" | "relancer" 
 export interface Moi {
   identifiant: string; nom: string; email: string; superutilisateur: boolean; perimetre: string[] | null;
   administrateur: boolean; role: string; role_libelle: string; permissions: Permission[]; session_minutes: number;
+  deux_facteurs: boolean;
 }
 
 export interface Compte {
   id: number; identifiant: string; email: string; prenom: string; nom: string; actif: boolean; superutilisateur: boolean;
-  role: string; tutelles: string[]; derniere_connexion: string | null; mot_de_passe_defini: boolean;
+  role: string; tutelles: string[]; derniere_connexion: string | null; mot_de_passe_defini: boolean; deux_facteurs: boolean;
 }
 
 export interface LigneJournal {

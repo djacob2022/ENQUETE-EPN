@@ -132,6 +132,7 @@ AUTHENTICATION_BACKENDS = ["enquete.securite.AuthentificationProtegee"]
 
 # Plus gros envoi accepté : une pièce jointe de 10 Mo plus l'enveloppe de la requête.
 TAILLE_MAX_REQUETE = 12 * 1024 * 1024
+TAILLE_MAX_RESTAURATION = int(os.environ.get("RESTAURATION_MAX_MO", "500")) * 1024 * 1024
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

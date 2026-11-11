@@ -8,6 +8,11 @@
 	encode zstd gzip
 
 	# Même limite que l'application : une pièce jointe de 10 Mo plus l'enveloppe de la requête.
+	# Restauration d'une sauvegarde complète (super-administrateur) : envoi plus gros autorisé.
+	@restauration path /api/gestion/restauration/
+	request_body @restauration {
+		max_size 500MB
+	}
 	request_body {
 		max_size 12MB
 	}

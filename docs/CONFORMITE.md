@@ -8,11 +8,11 @@ Légende : **Conforme** · **Partiel** (l'écart est décrit) · **Non traité**
 
 | Priorité | Exigences | Conformes | Partielles | Non traitées |
 | --- | --- | --- | --- | --- |
-| M (indispensable) | 37 | 36 | 1 | 0 |
-| S (souhaitable) | 11 | 7 | 1 | 3 |
-| C (optionnel) | 2 | 0 | 0 | 2 |
+| M (indispensable) | 37 | 37 | 0 | 0 |
+| S (souhaitable) | 11 | 11 | 0 | 0 |
+| C (optionnel) | 2 | 1 | 0 | 1 |
 
-Le seul écart de priorité M concerne F-27 : le récapitulatif PDF est produit par l'impression du navigateur (« Enregistrer en PDF »), pas par le serveur.
+Toutes les exigences M et S sont couvertes. Reste hors version le questionnaire bilingue (F-16, optionnel).
 
 ## Section 3 · Acteurs et rôles
 
@@ -42,7 +42,7 @@ Chaque question porte un code unique, un libellé, une aide, un type, un caract�
 | --- | --- | --- | --- | --- |
 | F-01 | Connexion e-mail et mot de passe, politique robuste | M | Connexion par e-mail ou identifiant ; 12 caractères minimum, trois types de caractères, mots courants refusés ; Argon2 | Conforme |
 | F-02 | Réinitialisation par lien e-mail | M | « Mot de passe oublié ? » : lien à usage unique valable 24 h ; réponse identique que le compte existe ou non | Conforme |
-| F-03 | Double authentification administrateurs | S | — | Non traité (prévu en évolution : code par e-mail ou TOTP) |
+| F-03 | Double authentification administrateurs | S | Application TOTP (QR code), 8 codes de secours, code non rejouable, blocage après 5 échecs ; rappel affiché aux administrateurs ; réinitialisation par un administrateur | Conforme |
 | F-04 | Création des comptes, rôles, rattachement | M | Page **Comptes et rôles** ; la personne choisit son mot de passe via le lien reçu | Conforme |
 | F-05 | Import en masse des EPN et points focaux | M | Import Excel du répertoire (dénomination, sigle, catégorie, tutelle, région, e-mail du point focal, secteur, statut) | Conforme |
 | F-06 | Désactivation, expiration à 30 min d'inactivité | M | Case « Compte actif » ; session de 30 minutes repoussée à chaque requête (`SESSION_MINUTES`) | Conforme |
@@ -85,8 +85,8 @@ Chaque question porte un code unique, un libellé, une aide, un type, un caract�
 | F-23 | Contrôles en temps réel | M | Messages par champ ; sommes et taux recalculés pendant la saisie | Conforme |
 | F-24 | Pré-remplissage depuis la campagne précédente | S | Bouton par rubrique, inscrit au journal | Conforme |
 | F-25 | Pièces justificatives, 10 Mo | M | PDF, Word, Excel, JPG, PNG ; contrôle du contenu réel du fichier | Conforme |
-| F-26 | Import des réponses depuis un modèle Excel | S | — | Non traité (la saisie en ligne avec pré-remplissage couvre le besoin courant) |
-| F-27 | Certification, accusé de réception, PDF récapitulatif | M | Certification et accusé par e-mail ; récapitulatif imprimable ou enregistrable en PDF depuis le navigateur | Partiel (pas de PDF généré par le serveur) |
+| F-26 | Import des réponses depuis un modèle Excel | S | Modèle prérempli à télécharger (listes déroulantes, cellules protégées), réimport contrôlé comme la saisie en ligne, bilan des valeurs à corriger | Conforme |
+| F-27 | Certification, accusé de réception, PDF récapitulatif | M | Récapitulatif PDF officiel produit par le serveur (en-tête de l'institution, réponses par rubrique, pièces, certification), joint à l'accusé de réception et téléchargeable | Conforme |
 | F-28 | Ordinateur, tablette, téléphone | M | Interface responsive | Conforme |
 
 ### 5.6 Validation et suivi
@@ -96,7 +96,7 @@ Chaque question porte un code unique, un libellé, une aide, un type, un caract�
 | F-29 | Circuit brouillon, soumis, en revue, à corriger, validé | M | Statuts et actions « Prendre en revue », « Valider », « Renvoyer pour correction », « Rouvrir » ; e-mail à chaque décision | Conforme |
 | F-30 | Renvoi pour correction avec commentaire par question | M | Commentaire général et par question, affichés au répondant à côté des questions concernées ; correction possible après la clôture | Conforme |
 | F-31 | Suivi : taux global, par tutelle, par catégorie, retardataires | M | Tableau de bord (aussi par région), liste des retardataires et des réponses à examiner | Conforme |
-| F-32 | Détection d'anomalies | S | Écart de plus de 50 % avec la réponse de l'année précédente signalé sur la fiche | Partiel (pas de détection des valeurs aberrantes au sein d'une même campagne) |
+| F-32 | Détection d'anomalies | S | Écart de plus de 50 % avec l'année précédente, et valeurs atypiques au sein de la campagne (règle de Tukey, 3 écarts interquartiles) sur la fiche et dans les statistiques | Conforme |
 
 ### 5.9 Administration et traçabilité
 
@@ -105,7 +105,7 @@ Chaque question porte un code unique, un libellé, une aide, un type, un caract�
 | F-46 | Journal d'audit | M | Connexions, échecs, exports, soumissions, décisions de validation, relances, modifications de campagne, de questionnaire, de fiches EPN, de comptes et de paramètres. Non modifiable par l'application | Conforme |
 | F-47 | Notifications dans l'application et par e-mail | M | Cloche « Activité récente » ; e-mails d'invitation, relance, accusé, correction, validation, compte | Conforme |
 | F-48 | Logo, nom de l'institution, modèles d'e-mails, serveur d'envoi | M | Page **Paramètres** ; le serveur SMTP est affiché et se règle dans `.env` (le mot de passe ne va jamais en base) | Conforme |
-| F-49 | Sauvegarde et restauration depuis l'interface | S | Sauvegarde quotidienne automatique ; restauration par `deploiement/restaurer.sh` | Non traité dans l'interface |
+| F-49 | Sauvegarde et restauration depuis l'interface | S | Page « Mon compte » du super-administrateur : archive complète (données et fichiers) à télécharger, restauration avec confirmation ; en plus de la sauvegarde quotidienne automatique | Conforme |
 | F-50 | Aide en ligne, FAQ, guide téléchargeable | M | Page `/aide` : FAQ des établissements, guide par rôle, imprimable en PDF | Conforme |
 
 ## Section 6 · Exports, graphiques et statistiques
@@ -121,7 +121,7 @@ Chaque question porte un code unique, un libellé, une aide, un type, un caract�
 | F-39 | Graphiques automatiques | M | Barres pour les choix, histogramme pour les nombres, courbe des taux annuels | Conforme |
 | F-40 | Comparaison N-1 / N | M | Indicateurs et sommes comparés à la campagne précédente | Conforme |
 | F-41 | Graphiques personnalisés | S | Choix des deux variables croisées et du type (barres empilées, groupées, tableau) | Conforme |
-| F-42 | Carte des EPN par région | C | Répartition par région en tableau et en barres | Non traité (carte) |
+| F-42 | Carte des EPN par région | C | Carte des régions en cartogramme (une tuile par région, couleur selon le taux de réponse) ; un fond de carte officiel pourra la remplacer | Conforme |
 | F-43 | Filtres communs | M | Tutelle, catégorie, région, base de réponses | Conforme |
 | F-44 | Statistiques descriptives | M | Effectif, somme, moyenne, médiane, minimum, quartiles, maximum, écart-type | Conforme |
 | F-45 | Fréquences et tableaux croisés | M | Effectifs et pourcentages en ligne | Conforme |
@@ -139,7 +139,7 @@ Règles de format respectées : montants en nombres, dates au format date Excel,
 | Traçabilité | Journal non modifiable par l'application ; aucune purge automatique (conservation ≥ 3 ans) | Conforme |
 | Performance, disponibilité | Gunicorn (3 processus), contrôles de santé, redémarrage automatique | À mesurer en recette (tests de charge) |
 | Ergonomie, accessibilité | Français, responsive, clavier, contrastes, libellés ARIA | Conforme (audit WCAG 2.1 AA formel à réaliser) |
-| Maintenabilité | Code documenté, 70 tests automatisés, couverture du code métier 86 %, dépôt Git, CI | Conforme |
+| Maintenabilité | Code documenté, 76 tests automatisés, dépôt Git, CI | Conforme |
 | Évolutivité | Modules, questions et règles sans développement ; API JSON | Partiel (pas de documentation OpenAPI publiée) |
 
 ## Section 8 · Architecture et déploiement

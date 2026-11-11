@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ArrowUpRight, BellRing, CircleCheckBig, CircleDollarSign, Inbox, Link2, ScanSearch, Send, Users } from "lucide-react";
+import { ArrowUpRight, BellRing, CircleCheckBig, CircleDollarSign, Inbox, Link2, ScanSearch, Send, ShieldAlert, Users } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -67,6 +67,14 @@ export default function TableauDeBord() {
           {peut(moi, "relancer") && <Bouton icone={<BellRing className="h-4 w-4" />} onClick={() => setConfirmer(true)} disabled={!retard}>Relancer les retardataires</Bouton>}
           {peut(moi, "exporter") && <MenuExport params={{ campagne: campagne.id }} />}
         </>} />
+
+      {!moi.deux_facteurs && (moi.administrateur || moi.superutilisateur) && (
+        <Link to="/gestion/compte" className="mb-6 flex items-center gap-3 rounded-2xl border border-alerte/30 bg-alerte-doux px-5 py-4 text-sm transition hover:brightness-95">
+          <ShieldAlert className="h-4 w-4 text-alerte" />
+          <span className="flex-1"><strong>Protégez votre compte administrateur</strong> : activez la double authentification (2 minutes, avec votre téléphone).</span>
+          <span className="font-medium text-alerte">Activer →</span>
+        </Link>
+      )}
 
       {d && d.sans_lien > 0 && peut(moi, "gerer_liens") && (
         <Link to="/gestion/liens" className="mb-6 flex items-center gap-3 rounded-2xl border border-marque/25 bg-marque-doux/60 px-5 py-4 text-sm transition hover:bg-marque-doux">
@@ -138,6 +146,8 @@ export default function TableauDeBord() {
               </div>
             </Carte>
           </div>
+
+          {d.par_region.length > 0 && <CarteRegions regions={d.par_region} />}
 
           {peut(moi, "valider") && d.a_examiner.length > 0 && (
             <Carte className="overflow-hidden">
@@ -269,5 +279,28 @@ function ChargementTDB() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[0, 1, 2, 3].map((i) => <Squelette key={i} className="h-[132px] rounded-2xl" />)}</div>
       <div className="grid gap-6 xl:grid-cols-5"><Squelette className="h-[400px] rounded-2xl xl:col-span-2" /><Squelette className="h-[400px] rounded-2xl xl:col-span-3" /></div>
     </div>
+  );
+}
+
+/** F-42 : carte des régions sous forme de cartogramme (une tuile par région, couleur selon le taux de réponse).
+ *  Indépendant du pays : remplacer par un fond de carte officiel quand le découpage administratif est fourni. */
+function CarteRegions({ regions }: { regions: { libelle: string; soumis: number; total: number; taux: number }[] }) {
+  const total = regions.reduce((n, r) => n + r.total, 0);
+  const teinte = (t: number) => `rgb(var(--marque) / ${0.12 + 0.78 * (t / 100)})`;
+  return (
+    <Carte>
+      <EnTeteCarte titre="Carte des régions" sous={`Taux de réponse par région du siège · ${total} établissements ciblés`}
+        actions={<div className="flex items-center gap-2 text-xs text-discret">0 %<span className="h-2.5 w-28 rounded-full" style={{ background: `linear-gradient(90deg, ${teinte(0)}, ${teinte(100)})` }} />100 %</div>} />
+      <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 lg:grid-cols-5">
+        {[...regions].sort((a, b) => a.libelle.localeCompare(b.libelle)).map((r) => (
+          <div key={r.libelle} className="relative overflow-hidden rounded-2xl border border-trait p-4" style={{ background: teinte(r.taux) }}
+            title={`${r.libelle} : ${r.soumis} sur ${r.total} ont répondu`}>
+            <p className={cx("text-sm font-semibold", r.taux >= 60 ? "text-white dark:text-[#04140c]" : "text-encre")}>{r.libelle}</p>
+            <p className={cx("chiffres mt-3 text-2xl font-semibold tracking-tight", r.taux >= 60 ? "text-white dark:text-[#04140c]" : "text-encre")}>{r.taux} %</p>
+            <p className={cx("text-xs", r.taux >= 60 ? "text-white/85 dark:text-[#04140c]/80" : "text-discret")}>{r.soumis} / {r.total} établissements</p>
+          </div>
+        ))}
+      </div>
+    </Carte>
   );
 }

@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ArrowRight, BarChart3, FileSpreadsheet, MailCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, BarChart3, FileSpreadsheet, MailCheck, ShieldCheck } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import BoutonTheme from "@/composants/BoutonTheme";
@@ -17,6 +17,8 @@ export default function Connexion() {
   const [motDePasse, setMotDePasse] = useState("");
   const [erreur, setErreur] = useState<string>();
   const [envoi, setEnvoi] = useState(false);
+  const [etapeCode, setEtapeCode] = useState(false);
+  const [code, setCode] = useState("");
   const config = useConfig();
 
   async function connecter(e: FormEvent) {
@@ -24,7 +26,13 @@ export default function Connexion() {
     setEnvoi(true);
     setErreur(undefined);
     try {
-      const moi = await api.post<Moi>("/api/auth/connexion/", { identifiant, mot_de_passe: motDePasse });
+      const moi = etapeCode
+        ? await api.post<Moi>("/api/auth/verification/", { code })
+        : await api.post<Moi | { deux_facteurs: true }>("/api/auth/connexion/", { identifiant, mot_de_passe: motDePasse });
+      if (!("identifiant" in moi)) {  // mot de passe correct : code de l'application demandé (F-03)
+        setEtapeCode(true);
+        return;
+      }
       client.setQueryData(["moi"], moi);
       naviguer(state?.depuis ?? "/gestion", { replace: true });
     } catch (err) {
@@ -69,11 +77,26 @@ export default function Connexion() {
             </div>
             {state?.message && !erreur && <div role="status" className="rounded-xl border border-succes/30 bg-succes-doux px-4 py-3 text-sm font-medium text-succes">{state.message}</div>}
             {erreur && <div role="alert" className="rounded-xl border border-danger/30 bg-danger-doux px-4 py-3 text-sm font-medium text-danger">{erreur}</div>}
-            <Champ libelle="Adresse e-mail ou identifiant" autoComplete="username" autoFocus value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} />
-            <Champ libelle="Mot de passe" type="password" autoComplete="current-password" value={motDePasse} onChange={(e) => setMotDePasse(e.target.value)} />
-            <Bouton type="submit" variante="primaire" taille="lg" className="w-full" chargement={envoi} disabled={!identifiant || !motDePasse}>
-              Se connecter <ArrowRight className="h-4 w-4" />
-            </Bouton>
+            {etapeCode ? (<>
+              <div className="flex gap-3 rounded-xl border border-marque/25 bg-marque-doux/60 p-4 text-sm">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-marque" />
+                <p><strong>Double authentification.</strong> Saisissez le code à 6 chiffres affiché par votre application
+                  (Google Authenticator, Microsoft Authenticator…), ou un code de secours.</p>
+              </div>
+              <Champ libelle="Code de vérification" autoComplete="one-time-code" inputMode="text" autoFocus value={code}
+                onChange={(e) => setCode(e.target.value)} placeholder="123 456" className="[&_input]:chiffres [&_input]:text-center [&_input]:text-lg [&_input]:tracking-[.3em]" />
+              <Bouton type="submit" variante="primaire" taille="lg" className="w-full" chargement={envoi} disabled={code.replace(/\W/g, "").length < 6}>
+                Valider <ArrowRight className="h-4 w-4" />
+              </Bouton>
+              <button type="button" onClick={() => { setEtapeCode(false); setCode(""); setErreur(undefined); }}
+                className="inline-flex items-center gap-1.5 text-sm text-discret hover:text-encre"><ArrowLeft className="h-4 w-4" /> Changer de compte</button>
+            </>) : (<>
+              <Champ libelle="Adresse e-mail ou identifiant" autoComplete="username" autoFocus value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} />
+              <Champ libelle="Mot de passe" type="password" autoComplete="current-password" value={motDePasse} onChange={(e) => setMotDePasse(e.target.value)} />
+              <Bouton type="submit" variante="primaire" taille="lg" className="w-full" chargement={envoi} disabled={!identifiant || !motDePasse}>
+                Se connecter <ArrowRight className="h-4 w-4" />
+              </Bouton>
+            </>)}
             <div className="flex justify-between text-sm">
               <Link to="/mot-de-passe-oublie" className="font-medium text-marque hover:underline">Mot de passe oublié ?</Link>
               <a href="/aide" className="text-discret hover:text-encre">Aide</a>
