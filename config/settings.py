@@ -134,6 +134,15 @@ AUTHENTICATION_BACKENDS = ["enquete.securite.AuthentificationProtegee"]
 TAILLE_MAX_REQUETE = 12 * 1024 * 1024
 TAILLE_MAX_RESTAURATION = int(os.environ.get("RESTAURATION_MAX_MO", "500")) * 1024 * 1024
 
+# Assistant IA (Claude) : désactivé tant que la clé n'est pas fournie. Les données envoyées sont agrégées et sans
+# coordonnées des répondants (voir docs/ASSISTANT-IA.md).
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ASSISTANT_IA_MODELE = os.environ.get("ASSISTANT_IA_MODELE", "claude-opus-5-5")
+ASSISTANT_IA_EFFORT = os.environ.get("ASSISTANT_IA_EFFORT", "medium")
+ASSISTANT_IA_QUESTIONS_PAR_HEURE = int(os.environ.get("ASSISTANT_IA_QUESTIONS_PAR_HEURE", "30"))
+# Rapport annuel envoyé automatiquement aux administrateurs N jours après la clôture de la campagne (vide = jamais).
+RAPPORT_AUTO_JOURS = os.environ.get("RAPPORT_AUTO_JOURS", "15")
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},

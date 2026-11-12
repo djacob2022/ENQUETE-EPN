@@ -1163,3 +1163,109 @@ def restauration(request):
     tracer(request, "restauration", "Données restaurées depuis une sauvegarde", auteur=auteur, **resultat)
     logout(request)  # les sessions ont été effacées avec les données : reconnexion nécessaire
     return JsonResponse({"ok": True} | resultat)
+
+
+# --- Rapport annuel et assistant IA --------------------------------------------------------------------------------
+
+def _donnees_rapport(request, c, base=None):
+    """Chiffres du rapport annuel dans le périmètre du compte (rapport.collecter)."""
+    from . import rapport
+
+    base = base or request.GET.get("base", "validees")
+    if base not in ("validees", "envoyees", "toutes"):
+        base = "validees"
+    precedente = _campagne_precedente(c)
+    return rapport.collecter(c, _reponses_perimetre(request, c), base, precedente,
+                             _reponses_perimetre(request, precedente) if precedente else None,
+                             tutelles_autorisees(request.user))
+
+
+def _cle_perimetre(user):
+    return ",".join(sorted(tutelles_autorisees(user) or []))
+
+
+def _synthese_enregistree(request, c, base):
+    from .models import SyntheseIA
+
+    return SyntheseIA.objects.filter(campagne=c, perimetre=_cle_perimetre(request.user), base=base).first()
+
+
+@require_GET
+@equipe
+def rapport_annuel(request):
+    """Rapport annuel PDF de la campagne (données agrégées, périmètre du compte), avec la synthèse IA si elle existe."""
+    from . import rapport
+
+    c = _campagne(request)
+    d = _donnees_rapport(request, c)
+    s = _synthese_enregistree(request, c, d["base"]) if request.GET.get("ia", "1") != "0" else None
+    tracer(request, "rapport_annuel", f"Rapport annuel {c}", campagne=c.pk, base=d["base"], ia=bool(s))
+    return telechargement(rapport.generer(d, s.contenu if s else None), "application/pdf", rapport.nom_fichier(c))
+
+
+def _synthese_json(s):
+    if not s:
+        return None
+    return {"contenu": s.contenu, "date": s.date.isoformat(), "auteur": s.auteur, "modele": s.modele,
+            "nombre_reponses": s.nombre_reponses}
+
+
+def _quota_ia(request):
+    limite = settings.ASSISTANT_IA_QUESTIONS_PAR_HEURE
+    recents = Journal.objects.filter(action__in=("assistant_ia", "synthese_ia"), auteur=request.user.get_username(),
+                                     date__gte=timezone.now() - timedelta(hours=1)).count()
+    if recents >= limite:
+        raise Refus(f"Limite atteinte : {limite} demandes à l'assistant IA par heure. Réessayez plus tard.", 429)
+
+
+@require_http_methods(["GET", "POST"])
+@equipe
+def synthese_ia(request):
+    """GET : synthèse IA enregistrée pour le rapport annuel. POST : la (re)générer avec l'assistant."""
+    from . import assistant
+    from .models import SyntheseIA
+
+    c = _campagne(request)
+    corps = _corps(request) if request.method == "POST" else {}
+    base = corps.get("base") or request.GET.get("base", "validees")
+    if base not in ("validees", "envoyees", "toutes"):
+        base = "validees"
+    if request.method == "GET":
+        return JsonResponse({"disponible": assistant.disponible(),
+                             "synthese": _synthese_json(_synthese_enregistree(request, c, base))})
+    _exiger(request, "voir_nominatif")
+    _quota_ia(request)
+    d = _donnees_rapport(request, c, base)
+    if not d["reponses"]:
+        raise Refus("Aucune réponse sur cette base de calcul : rien à synthétiser.")
+    contenu, modele = assistant.synthese_rapport(assistant.contexte(d, nominatif=True))
+    s, _ = SyntheseIA.objects.update_or_create(
+        campagne=c, perimetre=_cle_perimetre(request.user), base=base,
+        defaults={"contenu": contenu, "modele": modele, "auteur": request.user.get_username(),
+                  "nombre_reponses": len(d["reponses"])})
+    tracer(request, "synthese_ia", f"Synthèse IA {c}", campagne=c.pk, base=base, n=len(d["reponses"]), modele=modele)
+    return JsonResponse({"disponible": True, "synthese": _synthese_json(s)})
+
+
+@require_http_methods(["GET", "POST"])
+@equipe
+def assistant_ia(request):
+    """GET : état et suggestions. POST {question, historique, base} : réponse de l'assistant sur la campagne."""
+    from . import assistant
+
+    nominatif = "voir_nominatif" in permissions_de(request.user)
+    if request.method == "GET":
+        return JsonResponse({"disponible": assistant.disponible(), "nominatif": nominatif,
+                             "modele": settings.ASSISTANT_IA_MODELE,
+                             "suggestions": assistant.SUGGESTIONS if nominatif else assistant.SUGGESTIONS_AGREGEES})
+    c = _campagne(request)
+    corps = _corps(request)
+    historique = corps.get("historique") or []
+    if not isinstance(historique, list):
+        raise Refus("Requête invalide.")
+    _quota_ia(request)
+    d = _donnees_rapport(request, c, corps.get("base"))
+    texte, modele = assistant.repondre(assistant.contexte(d, nominatif), corps.get("question"), historique)
+    tracer(request, "assistant_ia", str(corps.get("question", ""))[:200], campagne=c.pk, base=d["base"], modele=modele)
+    return JsonResponse({"reponse": texte, "modele": modele, "campagne": serializers.campagne(c), "base": d["base"],
+                         "n": len(d["reponses"])})

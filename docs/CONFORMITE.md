@@ -128,6 +128,14 @@ Chaque question porte un code unique, un libellé, une aide, un type, un caract�
 
 Règles de format respectées : montants en nombres, dates au format date Excel, en-têtes figés, filtres automatiques, nom `EPN_<exercice>_<date>.xlsx`, injection de formules neutralisée. Les statistiques portent par défaut sur les réponses validées et affichent toujours n. Les exports sont produits immédiatement ; le traitement en tâche de fond prévu au-delà de 500 EPN n'est pas nécessaire aux volumes actuels.
 
+### Au-delà du cahier des charges : rapport annuel automatique et assistant IA
+
+| Fonction | Mise en œuvre |
+| --- | --- |
+| Rapport annuel PDF | Page « Assistant IA et rapport » : couverture, synthèse, participation (tutelle, catégorie, région), indicateurs comparés à N-1 avec graphique, résultats par rubrique, contrôle qualité, méthodologie. Constats chiffrés rédigés automatiquement ; périmètre du compte ; aucune donnée nominative |
+| Envoi automatique | Commande `taches` : rapport envoyé une fois par e-mail aux administrateurs `RAPPORT_AUTO_JOURS` jours après la clôture (15 par défaut), tracé au journal |
+| Assistant IA | Questions en langage naturel sur la campagne (Claude, API d'Anthropic) ; synthèse rédigée intégrée au rapport. Facultatif (`ANTHROPIC_API_KEY`), limité à 30 demandes par heure et par compte, chaque question tracée au journal. Données envoyées : voir `docs/ASSISTANT-IA.md` |
+
 ## Section 7 · Exigences non fonctionnelles
 
 | Domaine | Mise en œuvre | Statut |

@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ArrowDownRight, ArrowUpRight, BarChart3, FileSpreadsheet, Grid3x3, LineChart as IconeCourbe, TriangleAlert } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BarChart3, FileSpreadsheet, FileText, Grid3x3, LineChart as IconeCourbe, TriangleAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -49,6 +49,9 @@ export default function Statistiques() {
           <a href={avecParams("/api/gestion/statistiques.xlsx", params)}
             className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-trait bg-surface px-4 text-sm font-medium shadow-sm hover:bg-relief">
             <FileSpreadsheet className="h-4 w-4 text-succes" /> Tableaux et graphiques Excel</a>
+          <Link to="/gestion/assistant"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-trait bg-surface px-4 text-sm font-medium shadow-sm hover:bg-relief">
+            <FileText className="h-4 w-4 text-danger" /> Rapport annuel</Link>
           {peut(moi, "exporter") && <MenuExport params={{ campagne: campagne.id, tutelle: filtres.tutelle, categorie: filtres.categorie, region: filtres.region }} />}
         </>} />
 
