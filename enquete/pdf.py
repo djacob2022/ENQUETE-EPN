@@ -20,6 +20,24 @@ TRAIT = colors.HexColor("#dde3de")
 DISCRET = colors.HexColor("#4d5a53")
 
 
+TEXTES_EN = {
+    "Récapitulatif des réponses": "Summary of answers", "exercice": "financial year", "Établissement": "Institution",
+    "Tutelle · catégorie": "Supervising authority · category", "Répondant": "Respondent", "Contact": "Contact",
+    "Statut": "Status", "Envoyé le": "Submitted on", "Non renseigné": "Not provided", "Ko": "KB",
+    "Réponse non encore envoyée : document provisoire.": "Answers not yet submitted: provisional document.",
+    "document généré le": "document generated on", "à": "at", "Récapitulatif": "Summary",
+}
+STATUTS_EN = {"invite": "Invited, not started", "en_cours": "Draft", "soumis": "Submitted", "en_revue": "Under review",
+              "valide": "Validated", "a_corriger": "To be corrected"}
+
+
+def _x(texte):
+    """Texte fixe du document, en anglais si le répondant a choisi l'anglais (F-16)."""
+    from .langue import anglais
+
+    return TEXTES_EN.get(texte, texte) if anglais() else texte
+
+
 def _t(texte):
     """Texte sûr pour les polices standard du PDF (jeu Windows-1252) et pour le balisage de ReportLab."""
     texte = str(texte if texte is not None else "").replace(" ", " ").replace(" ", " ")
@@ -61,9 +79,9 @@ def recapitulatif(reponse):
     p = Parametres.charger()
     s = _styles()
     tampon = BytesIO()
-    genere = timezone.localtime().strftime("%d/%m/%Y à %H:%M")
+    genere = timezone.localtime().strftime(f"%d/%m/%Y {_x('à')} %H:%M")
     doc = SimpleDocTemplate(tampon, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm,
-                            bottomMargin=18 * mm, title=f"Récapitulatif – {reponse.epn.nom}", author=p.valeur("institution"))
+                            bottomMargin=18 * mm, title=f"{_x('Récapitulatif')} – {reponse.epn.nom}", author=p.valeur("institution"))
     elements = []
     if p.logo:
         try:
@@ -72,17 +90,20 @@ def recapitulatif(reponse):
             pass
     elements += [Paragraph(_t(p.valeur("pays")).upper(), s["pays"]), Paragraph(_t(p.valeur("devise")), s["devise"]),
                  Spacer(1, 3), Paragraph(_t(p.valeur("ministere")), s["sous"]), Spacer(1, 8),
-                 Paragraph(_t("Récapitulatif des réponses"), s["titre"]),
-                 Paragraph(_t(f"{reponse.campagne.nom} · exercice {reponse.campagne.exercice}"), s["sous"]), Spacer(1, 10)]
+                 Paragraph(_t(_x("Récapitulatif des réponses")), s["titre"]),
+                 Paragraph(_t(f"{reponse.campagne.nom} · {_x('exercice')} {reponse.campagne.exercice}"), s["sous"]), Spacer(1, 10)]
 
-    statut = reponse.get_statut_display()
-    soumis = timezone.localtime(reponse.date_soumission).strftime("%d/%m/%Y à %H:%M") if reponse.date_soumission else "—"
+    from .langue import anglais
+
+    statut = STATUTS_EN.get(reponse.statut, reponse.get_statut_display()) if anglais() else reponse.get_statut_display()
+    soumis = (timezone.localtime(reponse.date_soumission).strftime(f"%d/%m/%Y {_x('à')} %H:%M")
+              if reponse.date_soumission else "—")
     infos = [
-        ("Établissement", f"{reponse.epn.nom}" + (f" ({reponse.epn.sigle})" if reponse.epn.sigle else "")),
-        ("Tutelle · catégorie", f"{reponse.epn.tutelle} · {reponse.epn.categorie}"),
-        ("Répondant", f"{reponse.repondant or '—'}" + (f", {reponse.fonction}" if reponse.fonction else "")),
-        ("Contact", " · ".join(x for x in (reponse.email, reponse.telephone) if x) or "—"),
-        ("Statut", statut), ("Envoyé le", soumis),
+        (_x("Établissement"), f"{reponse.epn.nom}" + (f" ({reponse.epn.sigle})" if reponse.epn.sigle else "")),
+        (_x("Tutelle · catégorie"), f"{reponse.epn.tutelle} · {reponse.epn.categorie}"),
+        (_x("Répondant"), f"{reponse.repondant or '—'}" + (f", {reponse.fonction}" if reponse.fonction else "")),
+        (_x("Contact"), " · ".join(x for x in (reponse.email, reponse.telephone) if x) or "—"),
+        (_x("Statut"), statut), (_x("Envoyé le"), soumis),
     ]
     t = Table([[Paragraph(_t(k), s["cellule"]), Paragraph(_t(v), s["valeur"])] for k, v in infos],
               colWidths=[42 * mm, None])
@@ -99,11 +120,11 @@ def recapitulatif(reponse):
                 continue
             if q["type"] == "fichier":
                 pj = pieces.get(q["code"])
-                valeur = f"{pj.nom_original} ({pj.taille // 1024} Ko)" if pj else ""
+                valeur = f"{pj.nom_original} ({pj.taille // 1024} {_x('Ko')})" if pj else ""
             else:
                 valeur = affichage(q, reponse.donnees.get(q["code"]))
             lignes.append([Paragraph(_t(q["code"]), s["cellule"]), Paragraph(_t(q["libelle"]), s["cellule"]),
-                           Paragraph(_t(valeur or "Non renseigné"), s["valeur"] if valeur else s["cellule"])])
+                           Paragraph(_t(valeur or _x("Non renseigné")), s["valeur"] if valeur else s["cellule"])])
         if not lignes:
             continue
         tableau = Table(lignes, colWidths=[13 * mm, 82 * mm, None], repeatRows=0)
@@ -112,11 +133,16 @@ def recapitulatif(reponse):
                                      ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
         elements += [KeepTogether([Paragraph(_t(f"{module['code']}. {module['titre']}"), s["rubrique"]), tableau])]
 
-    elements += [Spacer(1, 12), Paragraph(_t(
+    certification = (
+        f"I, the undersigned, {reponse.repondant or '—'}{', ' + reponse.fonction if reponse.fonction else ''}, certify "
+        f"that the information submitted for {reponse.epn.nom} is accurate and complete." if anglais() else
         f"Je soussigné(e), {reponse.repondant or '—'}{', ' + reponse.fonction if reponse.fonction else ''}, certifie "
         f"l'exactitude et l'exhaustivité des informations transmises pour {reponse.epn.nom}."
-        if reponse.date_soumission else "Réponse non encore envoyée : document provisoire."), s["texte"])]
-    mention = f"{p.valeur('institution')} · ENQUÊTE-EPN · document généré le {genere}"
+    )
+    elements += [Spacer(1, 12), Paragraph(_t(
+        certification if reponse.date_soumission else _x("Réponse non encore envoyée : document provisoire.")),
+        s["texte"])]
+    mention = f"{p.valeur('institution')} · ENQUÊTE-EPN · {_x('document généré le')} {genere}"
     doc.build(elements, onFirstPage=lambda c, d: _pied(c, d, mention), onLaterPages=lambda c, d: _pied(c, d, mention))
     return tampon.getvalue()
 

@@ -6,6 +6,7 @@ import {
   TextareaHTMLAttributes, useCallback, useContext, useEffect, useId, useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { t } from "@/lib/langue";
 import { Statut } from "@/lib/types";
 
 export const cx = clsx;
@@ -256,7 +257,7 @@ export function Tiroir({ ouvert, fermer, titre, children, largeur = 720 }: {
             initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 32, stiffness: 320 }}>
             <div className="flex items-center justify-between gap-4 border-b border-trait bg-surface px-6 py-4">
               <div className="min-w-0 flex-1">{titre}</div>
-              <Bouton variante="fantome" taille="sm" onClick={fermer} aria-label="Fermer"><X className="h-4 w-4" /></Bouton>
+              <Bouton variante="fantome" taille="sm" onClick={fermer} aria-label={t("Fermer")}><X className="h-4 w-4" /></Bouton>
             </div>
             <div className="defilement-fin flex-1 overflow-y-auto">{children}</div>
           </motion.aside>

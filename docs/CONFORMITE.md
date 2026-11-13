@@ -10,9 +10,9 @@ Légende : **Conforme** · **Partiel** (l'écart est décrit) · **Non traité**
 | --- | --- | --- | --- | --- |
 | M (indispensable) | 37 | 37 | 0 | 0 |
 | S (souhaitable) | 11 | 11 | 0 | 0 |
-| C (optionnel) | 2 | 1 | 0 | 1 |
+| C (optionnel) | 2 | 2 | 0 | 0 |
 
-Toutes les exigences M et S sont couvertes. Reste hors version le questionnaire bilingue (F-16, optionnel).
+Toutes les exigences du cahier des charges sont couvertes, y compris les deux exigences optionnelles (F-16, F-42).
 
 ## Section 3 · Acteurs et rôles
 
@@ -65,7 +65,7 @@ Chaque question porte un code unique, un libellé, une aide, un type, un caract�
 | F-13 | Questions conditionnelles | M | « Afficher seulement si » une réponse précédente vaut l'une des valeurs choisies ; une question masquée n'est pas exigée et sa réponse est effacée | Conforme |
 | F-14 | Versionnage, duplication d'une campagne à l'autre | M | Version incrémentée à chaque enregistrement ; une nouvelle campagne reprend le questionnaire choisi. Une question déjà renseignée ne peut être ni supprimée ni changée de type | Conforme |
 | F-15 | Aperçu répondant | S | Aperçu interactif, conditions comprises | Conforme |
-| F-16 | Questionnaire bilingue | C | — | Non traité |
+| F-16 | Questionnaire bilingue | C | Sélecteur FR / EN sur tout le parcours de l'établissement (lien commun, questionnaire, récapitulatif, aide) ; questionnaire par défaut entièrement traduit ; version anglaise de chaque texte saisissable dans l'éditeur (repli sur le français) ; messages de contrôle, récapitulatif PDF, accusé de réception et modèle Excel en anglais ; l'équipe d'enquête garde l'interface en français | Conforme |
 
 ### 5.4 Gestion des campagnes
 

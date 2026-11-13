@@ -23,6 +23,7 @@ from .emails import (envoyer_acces, envoyer_correction, envoyer_invitation, envo
                      envoyer_nouveau_lien, envoyer_relance, envoyer_validation)
 from .forms import CampagneForm, EPNForm, IdentificationForm, ImportEPNForm
 from .journal import LIBELLES, tracer
+from .langue import anglais, tr, tr_erreurs
 from .models import (EPN, Campagne, DoubleAuthentification, EchecConnexion, Envoi, Journal, ListeReference, Parametres,
                      PieceJointe, ProfilEquipe, Reponse, double_auth_active, lien_public, permissions_de, role_de,
                      tutelles_autorisees)
@@ -43,7 +44,7 @@ def _corps(request):
 
 
 def _erreurs(form):
-    return JsonResponse({"erreurs": {c: [str(e) for e in l] for c, l in form.errors.items()}}, status=422)
+    return JsonResponse({"erreurs": tr_erreurs({c: [str(e) for e in l] for c, l in form.errors.items()})}, status=422)
 
 
 def api(vue):
@@ -53,7 +54,7 @@ def api(vue):
         try:
             return vue(request, *args, **kwargs)
         except Refus as r:
-            return JsonResponse({"erreur": r.message}, status=r.statut)
+            return JsonResponse({"erreur": tr(r.message)}, status=r.statut)
     return enveloppe
 
 
@@ -203,6 +204,14 @@ def _reponse(jeton):
     return get_object_or_404(Reponse.objects.select_related("epn", "campagne"), jeton=jeton)
 
 
+def _noter_langue(r):
+    """Langue choisie par le répondant (F-16) : sert à l'accusé de réception et au récapitulatif envoyé par e-mail."""
+    langue = "en" if anglais() else "fr"
+    if r.langue != langue:
+        r.langue = langue
+        Reponse.objects.filter(pk=r.pk).update(langue=langue)
+
+
 def _repondant(r):
     return f"EPN : {r.epn.sigle or r.epn.nom}"[:150]
 
@@ -218,6 +227,7 @@ def reponse(request, jeton):
 def identification(request, jeton):
     r = _reponse(jeton)
     services.exiger_saisie_possible(r, identification_requise=False)
+    _noter_langue(r)
     form = IdentificationForm(_corps(request), instance=r)
     if not form.is_valid():
         return _erreurs(form)
@@ -231,7 +241,9 @@ def module(request, jeton, code):
     r = _reponse(jeton)
     services.exiger_saisie_possible(r)
     corps = _corps(request)
-    erreurs = services.enregistrer_module(r, code, corps.get("valeurs") or {}, valider=corps.get("valider", False))
+    _noter_langue(r)
+    erreurs = tr_erreurs(services.enregistrer_module(r, code, corps.get("valeurs") or {},
+                                                     valider=corps.get("valider", False)))
     return JsonResponse({"erreurs": erreurs, "reponse": serializers.reponse_publique(r)},
                         status=422 if erreurs and corps.get("valider") else 200)
 
@@ -286,7 +298,7 @@ def import_xlsx(request, jeton):
     nombre, erreurs, modules = modele_excel.importer(r, request.FILES["fichier"])
     tracer(request, "import_excel", r.epn.nom, auteur=_repondant(r), valeurs=nombre, erreurs=len(erreurs),
            **_detail_reponse(r))
-    return JsonResponse({"valeurs": nombre, "rubriques": modules, "erreurs": erreurs,
+    return JsonResponse({"valeurs": nombre, "rubriques": modules, "erreurs": tr_erreurs(erreurs),
                          "reponse": serializers.reponse_publique(r)})
 
 
@@ -305,6 +317,7 @@ def recapitulatif_pdf(request, jeton):
 def soumettre(request, jeton):
     r = _reponse(jeton)
     services.exiger_saisie_possible(r)
+    _noter_langue(r)
     r = services.soumettre(r, bool(_corps(request).get("certification")))
     tracer(request, "soumission", r.epn.nom, auteur=_repondant(r), certifie_par=r.repondant, **_detail_reponse(r))
     return JsonResponse(serializers.reponse_publique(r))

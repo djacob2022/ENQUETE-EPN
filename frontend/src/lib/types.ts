@@ -2,7 +2,7 @@ export type TypeQuestion =
   | "texte" | "texte_long" | "url" | "entier" | "montant" | "pourcentage" | "date"
   | "choix" | "choix_multiple" | "oui_non" | "echelle" | "tableau" | "fichier";
 
-export interface Choix { valeur: string; libelle: string }
+export interface Choix { valeur: string; libelle: string; libelle_en?: string }
 
 export interface Question {
   code: string;
@@ -16,14 +16,20 @@ export interface Question {
   annee?: boolean;
   choix?: Choix[];
   si?: { question: string; valeurs: string[] };
-  colonnes?: { code: string; libelle: string; type: "texte" | "nombre" }[];
+  colonnes?: { code: string; libelle: string; type: "texte" | "nombre"; libelle_en?: string }[];
   libelle_min?: string;
   libelle_max?: string;
+  // Version anglaise (F-16), éditeur seulement
+  libelle_en?: string;
+  aide_en?: string;
+  unite_en?: string;
+  libelle_min_en?: string;
+  libelle_max_en?: string;
 }
 
-export interface Module { code: string; titre: string; intro: string; actif?: boolean; questions: Question[] }
+export interface Module { code: string; titre: string; intro: string; actif?: boolean; questions: Question[]; titre_en?: string; intro_en?: string }
 
-export interface Regle { type: "somme" | "inferieur"; total?: string; parties?: string[]; petit?: string; grand?: string; message?: string }
+export interface Regle { type: "somme" | "inferieur"; total?: string; parties?: string[]; petit?: string; grand?: string; message?: string; message_en?: string }
 
 export interface Questionnaire { modules: Module[]; version: number; fichiers: { accept: string; taille_max: number } }
 

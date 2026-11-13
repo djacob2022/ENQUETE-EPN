@@ -85,16 +85,21 @@ def envoyer_relance(reponse, par=""):
 
 
 def envoyer_accuse(reponse):
-    """Accusé de réception, avec le récapitulatif officiel en PDF (F-27)."""
-    joindre = []
-    try:
-        from . import pdf
+    """Accusé de réception, avec le récapitulatif officiel en PDF (F-27), dans la langue du répondant (F-16)."""
+    from django.utils import translation
 
-        joindre.append((pdf.nom_fichier(reponse), pdf.recapitulatif(reponse), "application/pdf"))
-    except Exception:  # le PDF ne doit jamais empêcher l'accusé de partir
-        logger.exception("Récapitulatif PDF impossible pour %s", reponse)
-    return _envoyer(reponse, Envoi.Type.ACCUSE, "accuse",
-                    f"Accusé de réception – [{reponse.campagne}] {reponse.epn.nom}", joindre=joindre)
+    anglais = reponse.langue == "en"
+    with translation.override("en" if anglais else "fr"):
+        joindre = []
+        try:
+            from . import pdf
+
+            joindre.append((pdf.nom_fichier(reponse), pdf.recapitulatif(reponse), "application/pdf"))
+        except Exception:  # le PDF ne doit jamais empêcher l'accusé de partir
+            logger.exception("Récapitulatif PDF impossible pour %s", reponse)
+        sujet = (f"Acknowledgement of receipt – [{reponse.campagne}] {reponse.epn.nom}" if anglais else
+                 f"Accusé de réception – [{reponse.campagne}] {reponse.epn.nom}")
+        return _envoyer(reponse, Envoi.Type.ACCUSE, "accuse_en" if anglais else "accuse", sujet, joindre=joindre)
 
 
 def envoyer_correction(reponse, par=""):

@@ -14,3 +14,7 @@ Cordialement,
 {{ signature }}{% endif %}{% if assistance %}
 
 Assistance : {{ assistance }}{% endif %}
+
+---
+This questionnaire is also available in English: open the link above and choose “EN” at the top of the page, or use:
+{{ reponse.lien }}?langue=en

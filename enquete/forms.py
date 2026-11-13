@@ -7,7 +7,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 
 from .models import EPN, Campagne, Reponse
 from .pieces import ACCEPT, LIBELLE_FORMATS, valider_piece
-from .questionnaire import OUI_NON, condition_remplie
+from .questionnaire import oui_non, condition_remplie
 
 
 class IdentificationForm(forms.ModelForm):
@@ -108,7 +108,7 @@ def _champ(q, brouillon, deja_depose=False, pose=True):
     if t == "tableau":
         return TableauField(q.get("colonnes", []), **commun)
     if t == "oui_non":
-        return forms.ChoiceField(choices=OUI_NON, widget=forms.RadioSelect, **commun)
+        return forms.ChoiceField(choices=oui_non(), widget=forms.RadioSelect, **commun)
     if t == "choix":
         return forms.ChoiceField(choices=q["choix"], widget=forms.RadioSelect, **commun)
     if t == "choix_multiple":

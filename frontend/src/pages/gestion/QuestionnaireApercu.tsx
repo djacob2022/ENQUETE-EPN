@@ -1,7 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowDown, ArrowUp, Eye, EyeOff, GitBranch, GripVertical, ListChecks, Pencil, Plus, Printer, Save, Sigma, Trash2, Undo2,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, GitBranch, GripVertical, Languages, ListChecks, Pencil, Plus, Printer, Save, Sigma, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, ErreurApi } from "@/lib/api";
 import { date } from "@/lib/format";
@@ -144,6 +142,20 @@ export default function QuestionnaireApercu() {
               <textarea value={module.intro} disabled={lecture} rows={2} placeholder="Texte d'introduction affiché en tête de rubrique (facultatif)"
                 onChange={(e) => majModule(actif, (m) => ({ ...m, intro: e.target.value }))}
                 className="w-full resize-y rounded-lg border border-trait bg-surface px-3 py-2 text-sm focus:border-marque focus:outline-none disabled:border-transparent" />
+              <details className="group rounded-lg border border-dashed border-trait px-3 py-2 text-sm">
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-medium text-discret">
+                  <Languages className="h-4 w-4" /> Version anglaise de la rubrique
+                  <span className="ml-auto text-xs font-normal">{module.titre_en ? module.titre_en : "non traduite : affichée en français"}</span>
+                </summary>
+                <div className="mt-2 space-y-2">
+                  <input value={module.titre_en ?? ""} disabled={lecture} placeholder="Title in English" aria-label="Titre de la rubrique en anglais" lang="en"
+                    onChange={(e) => majModule(actif, (m) => ({ ...m, titre_en: e.target.value }))}
+                    className="h-10 w-full rounded-lg border border-trait bg-surface px-3 text-sm focus:border-marque focus:outline-none" />
+                  <textarea value={module.intro_en ?? ""} disabled={lecture} rows={2} placeholder="Introduction in English (optional)" aria-label="Introduction en anglais" lang="en"
+                    onChange={(e) => majModule(actif, (m) => ({ ...m, intro_en: e.target.value }))}
+                    className="w-full resize-y rounded-lg border border-trait bg-surface px-3 py-2 text-sm focus:border-marque focus:outline-none" />
+                </div>
+              </details>
             </div>
             <ol className="divide-y divide-trait">
               {module.questions.map((x, i) => (
@@ -250,6 +262,22 @@ function EditeurQuestion({ edition, toutes, types, fermer, valider }: {
         </div>
         <Champ libelle="Aide en ligne (facultatif)" value={q.aide ?? ""} onChange={(e) => maj({ aide: e.target.value })} aide="Affichée sous la question." />
 
+        <div className="rounded-xl border border-trait bg-relief/30 p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold"><Languages className="h-4 w-4 text-marque" /> Version anglaise</p>
+          <p className="mt-0.5 text-[13px] text-discret">Affichée aux établissements qui choisissent « EN ». Champ vide : le texte français est repris.</p>
+          <div className="mt-3 space-y-3" lang="en">
+            <ZoneTexte libelle="Question label (English)" rows={2} value={q.libelle_en ?? ""} onChange={(e) => maj({ libelle_en: e.target.value })} />
+            {q.aide && <Champ libelle="Help text (English)" value={q.aide_en ?? ""} onChange={(e) => maj({ aide_en: e.target.value })} />}
+            {q.unite && <Champ libelle="Unit (English)" value={q.unite_en ?? ""} onChange={(e) => maj({ unite_en: e.target.value })} />}
+            {q.type === "echelle" && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Champ libelle="Minimum label (English)" value={q.libelle_min_en ?? ""} onChange={(e) => maj({ libelle_min_en: e.target.value })} />
+                <Champ libelle="Maximum label (English)" value={q.libelle_max_en ?? ""} onChange={(e) => maj({ libelle_max_en: e.target.value })} />
+              </div>
+            )}
+          </div>
+        </div>
+
         {(NUMERIQUES.includes(q.type) || q.type === "echelle") && (
           <div className="grid gap-4 sm:grid-cols-3">
             <Champ libelle="Minimum" inputMode="decimal" value={q.min ?? ""} onChange={(e) => maj({ min: nombre(e.target.value) })} />
@@ -267,8 +295,12 @@ function EditeurQuestion({ edition, toutes, types, fermer, valider }: {
         {A_CHOIX.includes(q.type) && (
           <ListeEditable titre="Choix proposés" elements={q.choix ?? []} vide={{ valeur: "", libelle: "" }}
             changer={(choix) => maj({ choix })} rendu={(c, m) => (
-              <input value={c.libelle} onChange={(e) => m({ ...c, libelle: e.target.value })} placeholder="Libellé du choix" aria-label="Libellé du choix"
-                className="h-10 flex-1 rounded-lg border border-trait bg-surface px-3 text-sm focus:border-marque focus:outline-none" />
+              <>
+                <input value={c.libelle} onChange={(e) => m({ ...c, libelle: e.target.value })} placeholder="Libellé du choix" aria-label="Libellé du choix"
+                  className="h-10 flex-1 rounded-lg border border-trait bg-surface px-3 text-sm focus:border-marque focus:outline-none" />
+                <input value={c.libelle_en ?? ""} onChange={(e) => m({ ...c, libelle_en: e.target.value })} placeholder="English" aria-label="Libellé du choix en anglais" lang="en"
+                  className="h-10 w-[38%] rounded-lg border border-dashed border-trait bg-surface px-3 text-sm focus:border-marque focus:outline-none" />
+              </>
             )} />
         )}
         {q.type === "tableau" && (
@@ -276,6 +308,8 @@ function EditeurQuestion({ edition, toutes, types, fermer, valider }: {
             changer={(colonnes) => maj({ colonnes })} rendu={(c, m) => (<>
               <input value={c.libelle} onChange={(e) => m({ ...c, libelle: e.target.value })} placeholder="Intitulé de colonne" aria-label="Intitulé de colonne"
                 className="h-10 flex-1 rounded-lg border border-trait bg-surface px-3 text-sm focus:border-marque focus:outline-none" />
+              <input value={c.libelle_en ?? ""} onChange={(e) => m({ ...c, libelle_en: e.target.value })} placeholder="English" aria-label="Intitulé de colonne en anglais" lang="en"
+                className="h-10 w-[30%] rounded-lg border border-dashed border-trait bg-surface px-3 text-sm focus:border-marque focus:outline-none" />
               <select value={c.type} onChange={(e) => m({ ...c, type: e.target.value as "texte" | "nombre" })} aria-label="Type de colonne"
                 className="h-10 rounded-lg border border-trait bg-surface px-2 text-sm"><option value="texte">Texte</option><option value="nombre">Nombre</option></select>
             </>)} />

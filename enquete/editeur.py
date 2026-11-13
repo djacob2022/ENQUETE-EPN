@@ -45,6 +45,48 @@ def _choix(brut, q_code):
     return choix
 
 
+def _choix_en(q, choix, ancien=None):
+    """Libellés anglais des choix, {valeur: libellé}. Acceptés sous forme de dictionnaire ou de liste alignée sur les
+    choix (les choix envoyés par l'éditeur portent alors un champ « libelle_en »)."""
+    brut = q.get("choix_en")
+    sortie = {}
+    if isinstance(brut, dict):
+        sortie = {str(k): _texte(v, 200) for k, v in brut.items() if _texte(v, 200)}
+    for c in q.get("choix") or []:
+        if isinstance(c, dict) and _texte(c.get("libelle_en"), 200):
+            valeur = _texte(c.get("valeur"), 40) or re.sub(r"[^a-z0-9]+", "_", _texte(c.get("libelle"), 200).lower()).strip("_")[:40]
+            sortie[valeur] = _texte(c.get("libelle_en"), 200)
+    from .questionnaire_en import EN
+
+    francais = dict(choix)
+    anciens = dict((ancien or {}).get("choix") or [])
+    anciens_en = (ancien or {}).get("choix_en") or {}
+    garde = {}
+    for k, v in sortie.items():
+        if k not in francais or v == EN.get(francais[k]):
+            continue
+        if k in anciens and not anciens_en.get(k) and francais[k] != anciens[k] and v == EN.get(anciens[k]):
+            continue  # libellé français modifié, traduction automatique non retouchée : périmée
+        garde[k] = v
+    return garde
+
+
+def _anglais_utile(propre, ancien, cle):
+    """Ne garde « cle_en » que s'il apporte quelque chose (F-16) : pas la traduction automatique du texte français,
+    ni l'ancienne traduction automatique quand le français a changé (elle serait périmée). Une traduction saisie par
+    l'administrateur est conservée."""
+    from .questionnaire_en import EN
+
+    en = propre.get(f"{cle}_en")
+    if not en:
+        return
+    ancien = ancien or {}
+    ancien_en = ancien.get(f"{cle}_en") or EN.get(ancien.get(cle) or "")
+    automatique = bool(ancien) and not ancien.get(f"{cle}_en")  # l'ancienne version anglaise n'avait pas été saisie
+    if en == EN.get(propre.get(cle) or "") or (automatique and propre.get(cle) != ancien.get(cle) and en == ancien_en):
+        del propre[f"{cle}_en"]
+
+
 def _prochain_code(module_code, utilises):
     n = 1
     while f"{module_code}{n:02d}" in utilises:
@@ -57,6 +99,8 @@ def normaliser(definition, ancienne):
     if not isinstance(definition, dict) or not isinstance(definition.get("modules"), list):
         raise Refus("Questionnaire illisible.")
     codes_existants = {q["code"] for m in ancienne.get("modules", []) for q in m.get("questions", [])}
+    anciennes_q = {q["code"]: q for m in ancienne.get("modules", []) for q in m.get("questions", [])}
+    anciens_m = {m["code"]: m for m in ancienne.get("modules", [])}
     utilises = set(codes_existants)
     modules, codes_modules, toutes = [], set(), {}
 
@@ -89,9 +133,14 @@ def normaliser(definition, ancienne):
             propre = {"code": code, "libelle": libelle, "type": type_q}
             if q.get("obligatoire") is False:
                 propre["obligatoire"] = False
-            for cle, longueur in (("aide", 500), ("unite", 40), ("libelle_min", 60), ("libelle_max", 60)):
+            # Version anglaise facultative (F-16) : « libelle_en », « aide_en »…
+            for cle, longueur in (("libelle_en", 500), ("aide", 500), ("aide_en", 500), ("unite", 40), ("unite_en", 40),
+                                  ("libelle_min", 60), ("libelle_min_en", 60), ("libelle_max", 60),
+                                  ("libelle_max_en", 60)):
                 if _texte(q.get(cle), longueur):
                     propre[cle] = _texte(q.get(cle), longueur)
+            for cle in ("libelle", "aide", "unite", "libelle_min", "libelle_max"):
+                _anglais_utile(propre, anciennes_q.get(code), cle)
             if type_q in TYPES_NUMERIQUES or type_q == "echelle":
                 for cle in ("min", "max"):
                     n = _nombre(q.get(cle))
@@ -110,13 +159,21 @@ def normaliser(definition, ancienne):
                 propre["choix"] = _choix(q.get("choix"), code)
                 if len(propre["choix"]) < 2:
                     raise Refus(f"{code} : indiquez au moins deux choix.")
+                choix_en = _choix_en(q, propre["choix"], anciennes_q.get(code))
+                if choix_en:
+                    propre["choix_en"] = choix_en
             if type_q == "tableau":
                 colonnes = []
                 for c in q.get("colonnes") or []:
                     lib = _texte(c.get("libelle"), 80)
                     if lib:
                         cc = _texte(c.get("code"), 30) or re.sub(r"[^a-z0-9]+", "_", lib.lower()).strip("_")[:30]
-                        colonnes.append({"code": cc, "libelle": lib, "type": "nombre" if c.get("type") == "nombre" else "texte"})
+                        colonne = {"code": cc, "libelle": lib, "type": "nombre" if c.get("type") == "nombre" else "texte"}
+                        if _texte(c.get("libelle_en"), 80):
+                            colonne["libelle_en"] = _texte(c.get("libelle_en"), 80)
+                            anciennes_col = {x["code"]: x for x in (anciennes_q.get(code) or {}).get("colonnes") or []}
+                            _anglais_utile(colonne, anciennes_col.get(cc), "libelle")
+                        colonnes.append(colonne)
                 if not colonnes:
                     raise Refus(f"{code} : un tableau doit avoir au moins une colonne.")
                 propre["colonnes"] = colonnes
@@ -126,8 +183,13 @@ def normaliser(definition, ancienne):
                                 "valeurs": [_texte(v, 40) for v in si.get("valeurs") or [] if _texte(v, 40)]}
             toutes[code] = propre
             questions.append(propre)
-        modules.append({"code": code_m, "titre": titre, "intro": _texte(m.get("intro"), 1000),
-                        "actif": m.get("actif", True) is not False, "questions": questions})
+        module = {"code": code_m, "titre": titre, "intro": _texte(m.get("intro"), 1000),
+                  "actif": m.get("actif", True) is not False, "questions": questions}
+        for cle, longueur in (("titre", 200), ("intro", 1000)):
+            if _texte(m.get(f"{cle}_en"), longueur):
+                module[f"{cle}_en"] = _texte(m.get(f"{cle}_en"), longueur)
+                _anglais_utile(module, anciens_m.get(code_m), cle)
+        modules.append(module)
 
     for q in toutes.values():
         si = q.get("si")
@@ -154,8 +216,9 @@ def normaliser(definition, ancienne):
         for c in codes:
             if c not in toutes or toutes[c]["type"] not in TYPES_NUMERIQUES:
                 raise Refus(f"La règle vise {c}, qui n'est pas une question numérique du questionnaire.")
-        if _texte(r.get("message"), 300):
-            propre["message"] = _texte(r.get("message"), 300)
+        for cle in ("message", "message_en"):
+            if _texte(r.get(cle), 300):
+                propre[cle] = _texte(r.get(cle), 300)
         regles.append(propre)
 
     return {"modules": modules, "regles": regles}, toutes, codes_existants

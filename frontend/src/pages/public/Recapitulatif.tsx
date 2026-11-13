@@ -3,9 +3,11 @@ import { Check, CircleAlert, FileDown, FileText, PenLine, Printer, Send } from "
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BoutonTheme from "@/composants/BoutonTheme";
+import ChoixLangue from "@/composants/ChoixLangue";
 import { BandeauOfficiel } from "@/composants/Officiel";
 import { api, ErreurApi } from "@/lib/api";
 import { date } from "@/lib/format";
+import { avecLangue, t } from "@/lib/langue";
 import { ReponsePublique } from "@/lib/types";
 import { Badge, Bouton, Carte, cx, useToast } from "@/ui";
 import { urlApi, useFormulaire } from "./Formulaire";
@@ -22,8 +24,8 @@ function Synthese({ modifiable }: { modifiable: boolean }) {
             <div className="flex flex-wrap items-center gap-3 border-b border-trait px-6 py-4">
               <span className="font-mono text-xs text-discret">{m.code}</span>
               <h2 className="flex-1 font-semibold tracking-tight">{m.titre}</h2>
-              {modifiable && (complet ? <Badge ton="succes"><Check className="h-3 w-3" /> Complet</Badge> : <Badge ton="alerte">À compléter</Badge>)}
-              {modifiable && <Link to={`/r/${jeton}/${m.code}`} className="pas-imprimer inline-flex items-center gap-1 text-sm font-medium text-marque hover:underline"><PenLine className="h-3.5 w-3.5" /> Modifier</Link>}
+              {modifiable && (complet ? <Badge ton="succes"><Check className="h-3 w-3" /> {t("Complet")}</Badge> : <Badge ton="alerte">{t("À compléter")}</Badge>)}
+              {modifiable && <Link to={`/r/${jeton}/${m.code}`} className="pas-imprimer inline-flex items-center gap-1 text-sm font-medium text-marque hover:underline"><PenLine className="h-3.5 w-3.5" /> {t("Modifier")}</Link>}
             </div>
             <dl className="divide-y divide-trait">
               {m.questions.filter((q) => estPosee(q, reponse.donnees)).map((q) => {
@@ -33,12 +35,12 @@ function Synthese({ modifiable }: { modifiable: boolean }) {
                   <div key={q.code} className={cx("grid gap-1 px-6 py-3 sm:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] sm:gap-6",
                     modifiable && reponse.commentaires?.[q.code] && "bg-danger-doux/50")}>
                     <dt className="text-sm text-discret">{q.libelle}
-                      {modifiable && reponse.commentaires?.[q.code] && <span className="mt-1 block text-xs font-medium text-danger">Correction demandée : {reponse.commentaires[q.code]}</span>}
+                      {modifiable && reponse.commentaires?.[q.code] && <span className="mt-1 block text-xs font-medium text-danger">{t("Correction demandée : ")}{reponse.commentaires[q.code]}</span>}
                     </dt>
                     <dd className={cx("text-sm font-medium", !v && "font-normal text-discret/70")}>
                       {q.type === "fichier" && piece
                         ? <a href={piece.url} className="inline-flex items-center gap-1.5 text-marque hover:underline"><FileText className="h-3.5 w-3.5" />{v}</a>
-                        : v || "Non renseigné"}
+                        : v || t("Non renseigné")}
                     </dd>
                   </div>
                 );
@@ -75,15 +77,15 @@ export function Recapitulatif() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <p className="text-sm font-medium text-marque">Dernière étape</p>
-      <h1 className="titre-display mt-1 text-4xl sm:text-[44px]">Vérifiez avant d'envoyer</h1>
-      <p className="mt-2 text-discret">Relisez vos réponses. Après l'envoi, elles ne seront plus modifiables sans l'accord de la tutelle.</p>
+      <p className="text-sm font-medium text-marque">{t("Dernière étape")}</p>
+      <h1 className="titre-display mt-1 text-4xl sm:text-[44px]">{t("Vérifiez avant d'envoyer")}</h1>
+      <p className="mt-2 text-discret">{t("Relisez vos réponses. Après l'envoi, elles ne seront plus modifiables sans l'accord de la tutelle.")}</p>
 
       {manquants.length > 0 ? (
         <div className="mt-6 flex gap-3 rounded-2xl border border-alerte/30 bg-alerte-doux p-5">
           <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-alerte" />
           <div className="text-sm">
-            <p className="font-semibold text-alerte">{manquants.length} rubrique{manquants.length > 1 ? "s" : ""} à compléter</p>
+            <p className="font-semibold text-alerte">{t("{n} rubrique(s) à compléter", { n: manquants.length })}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {manquants.map((m) => (
                 <Link key={m.code} to={`/r/${jeton}/${m.code}`} className="rounded-lg bg-surface px-3 py-1.5 font-medium shadow-sm hover:text-marque">
@@ -95,26 +97,26 @@ export function Recapitulatif() {
         </div>
       ) : (
         <div className="mt-6 flex items-center gap-3 rounded-2xl border border-succes/30 bg-succes-doux p-5 text-sm font-medium text-succes">
-          <Check className="h-5 w-5" /> Toutes les rubriques sont complètes.
+          <Check className="h-5 w-5" /> {t("Toutes les rubriques sont complètes.")}
         </div>
       )}
 
       <div className="mt-6"><Synthese modifiable /></div>
 
       <Carte className="mt-6 p-6 sm:p-8">
-        <h2 className="text-lg font-semibold tracking-tight">Certification</h2>
+        <h2 className="text-lg font-semibold tracking-tight">{t("Certification")}</h2>
         <label className="mt-4 flex cursor-pointer gap-3 rounded-xl border border-trait p-4 transition hover:bg-relief/50">
           <input type="checkbox" checked={certifie} onChange={(e) => setCertifie(e.target.checked)} className="mt-0.5 h-5 w-5 accent-[rgb(var(--marque))]" />
           <span className="text-sm leading-relaxed">
-            Je soussigné(e), <strong>{id.prenom} {id.nom}</strong>{id.fonction && `, ${id.fonction}`}, certifie l'exactitude et
-            l'exhaustivité des informations transmises pour <strong>{reponse.epn.nom}</strong>.
+            {t("Je soussigné(e), {nom}, certifie l'exactitude et l'exhaustivité des informations transmises pour {epn}.",
+              { nom: `${id.prenom} ${id.nom}${id.fonction ? `, ${id.fonction}` : ""}`, epn: reponse.epn.nom })}
           </span>
         </label>
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-discret">Un accusé de réception, avec le récapitulatif en PDF, sera envoyé à {id.email}.
-            {" "}<a href={urlApi(jeton, "recapitulatif.pdf")} className="font-medium text-marque hover:underline">Aperçu du PDF</a></p>
+          <p className="text-xs text-discret">{t("Un accusé de réception, avec le récapitulatif en PDF, sera envoyé à {email}.", { email: id.email })}
+            {" "}<a href={avecLangue(urlApi(jeton, "recapitulatif.pdf"))} className="font-medium text-marque hover:underline">{t("Aperçu du PDF")}</a></p>
           <Bouton variante="primaire" taille="lg" disabled={!certifie || manquants.length > 0} chargement={envoi} onClick={envoyer}>
-            <Send className="h-4 w-4" /> Envoyer mes réponses
+            <Send className="h-4 w-4" /> {t("Envoyer mes réponses")}
           </Bouton>
         </div>
       </Carte>
@@ -126,7 +128,7 @@ export function Merci() {
   const { reponse, jeton } = useFormulaire();
   return (
     <div className="min-h-screen">
-      <BandeauOfficiel droite={<span className="pas-imprimer"><BoutonTheme /></span>} />
+      <BandeauOfficiel droite={<span className="pas-imprimer flex items-center gap-2"><ChoixLangue /><BoutonTheme /></span>} />
       <div className="h-8" />
       <main className="mx-auto max-w-3xl px-6 pb-20">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
@@ -138,20 +140,20 @@ export function Merci() {
               <motion.path d="M5 12.5l4.5 4.5L19 7.5" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.45, duration: 0.5 }} />
             </motion.svg>
           </motion.div>
-          <h1 className="titre-display relative mt-6 text-4xl sm:text-5xl">Merci, c'est envoyé.</h1>
+          <h1 className="titre-display relative mt-6 text-4xl sm:text-5xl">{t("Merci, c'est envoyé.")}</h1>
           <p className="relative mx-auto mt-3 max-w-md text-discret">
-            Les réponses de <strong className="text-encre">{reponse.epn.nom}</strong> ont été reçues le {date(reponse.date_soumission, true)}.
-            Un accusé de réception a été envoyé à {reponse.identification.email}.
+            {t("Les réponses de {epn} ont été reçues le {date}.", { epn: reponse.epn.nom, date: date(reponse.date_soumission, true) })}{" "}
+            {t("Un accusé de réception a été envoyé à {email}.", { email: reponse.identification.email })}
           </p>
           <div className="pas-imprimer relative mt-8 flex flex-wrap justify-center gap-2">
-            <a href={urlApi(jeton, "recapitulatif.pdf")} className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-marque px-4 text-sm font-medium text-white shadow-sm hover:bg-marque-fonce dark:text-[#04140c]">
-              <FileDown className="h-4 w-4" /> Télécharger le récapitulatif (PDF)</a>
-            <Bouton onClick={() => window.print()}><Printer className="h-4 w-4" /> Imprimer</Bouton>
+            <a href={avecLangue(urlApi(jeton, "recapitulatif.pdf"))} className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-marque px-4 text-sm font-medium text-white shadow-sm hover:bg-marque-fonce dark:text-[#04140c]">
+              <FileDown className="h-4 w-4" /> {t("Télécharger le récapitulatif (PDF)")}</a>
+            <Bouton onClick={() => window.print()}><Printer className="h-4 w-4" /> {t("Imprimer")}</Bouton>
           </div>
         </motion.div>
-        <h2 className="mb-4 mt-12 text-lg font-semibold tracking-tight">Récapitulatif de vos réponses</h2>
+        <h2 className="mb-4 mt-12 text-lg font-semibold tracking-tight">{t("Récapitulatif de vos réponses")}</h2>
         <Synthese modifiable={false} />
-        <p className="mt-8 text-center text-sm text-discret">Une correction est nécessaire ? Contactez l'administration de tutelle : elle peut rouvrir votre questionnaire.</p>
+        <p className="mt-8 text-center text-sm text-discret">{t("Une correction est nécessaire ? Contactez l'administration de tutelle : elle peut rouvrir votre questionnaire.")}</p>
       </main>
     </div>
   );

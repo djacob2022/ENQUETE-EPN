@@ -1,6 +1,8 @@
 import { ChevronDown, Download, Printer } from "lucide-react";
 import { BandeauOfficiel, useConfig } from "@/composants/Officiel";
 import BoutonTheme from "@/composants/BoutonTheme";
+import ChoixLangue from "@/composants/ChoixLangue";
+import { FAQ_EN, langue, t, useLangue } from "@/lib/langue";
 import { Bouton, Carte } from "@/ui";
 
 const FAQ_EPN: [string, string][] = [
@@ -38,21 +40,23 @@ const GUIDE_EQUIPE: [string, string[]][] = [
 /** Aide en ligne, foire aux questions et guide utilisateur imprimable (F-50). */
 export default function Aide() {
   const config = useConfig();
+  useLangue();
+  const faq = langue() === "en" ? FAQ_EN : FAQ_EPN;
   return (
     <div className="min-h-screen">
-      <BandeauOfficiel droite={<span className="pas-imprimer"><BoutonTheme /></span>} />
+      <BandeauOfficiel droite={<span className="pas-imprimer flex items-center gap-2"><ChoixLangue /><BoutonTheme /></span>} />
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <p className="text-sm font-medium text-marque">Aide en ligne</p>
-        <h1 className="titre-display mt-1 text-4xl sm:text-5xl">Guide de l'enquête sur les EPN</h1>
-        <p className="mt-3 text-discret">Questions fréquentes des établissements et guide de l'équipe d'enquête, par rôle.</p>
+        <p className="text-sm font-medium text-marque">{t("Aide en ligne")}</p>
+        <h1 className="titre-display mt-1 text-4xl sm:text-5xl">{t("Guide de l'enquête sur les EPN")}</h1>
+        <p className="mt-3 text-discret">{t("Questions fréquentes des établissements et guide de l'équipe d'enquête, par rôle.")}</p>
         <div className="pas-imprimer mt-6 flex flex-wrap gap-2">
-          <Bouton icone={<Printer className="h-4 w-4" />} onClick={() => window.print()}>Imprimer le guide</Bouton>
-          <Bouton variante="fantome" icone={<Download className="h-4 w-4" />} onClick={() => window.print()}>Enregistrer en PDF</Bouton>
+          <Bouton icone={<Printer className="h-4 w-4" />} onClick={() => window.print()}>{t("Imprimer le guide")}</Bouton>
+          <Bouton variante="fantome" icone={<Download className="h-4 w-4" />} onClick={() => window.print()}>{t("Enregistrer en PDF")}</Bouton>
         </div>
 
-        <h2 className="mb-4 mt-12 text-xl font-semibold tracking-tight">Établissements : questions fréquentes</h2>
+        <h2 className="mb-4 mt-12 text-xl font-semibold tracking-tight">{t("Établissements : questions fréquentes")}</h2>
         <div className="space-y-2">
-          {FAQ_EPN.map(([q, r]) => (
+          {faq.map(([q, r]) => (
             <details key={q} className="group rounded-2xl border border-trait bg-surface px-5 py-4 open:shadow-carte">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium">
                 {q}<ChevronDown className="h-4 w-4 shrink-0 text-discret transition group-open:rotate-180" />
@@ -62,7 +66,7 @@ export default function Aide() {
           ))}
         </div>
 
-        <h2 className="mb-4 mt-12 text-xl font-semibold tracking-tight">Équipe d'enquête : guide par rôle</h2>
+        <h2 className="mb-4 mt-12 text-xl font-semibold tracking-tight">{t("Équipe d'enquête : guide par rôle")}</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {GUIDE_EQUIPE.map(([role, points]) => (
             <Carte key={role} className="break-inside-avoid p-5">
@@ -73,7 +77,7 @@ export default function Aide() {
         </div>
 
         {config?.assistance && (
-          <p className="mt-12 rounded-2xl bg-marque-doux px-5 py-4 text-sm">Besoin d'aide ? Écrivez à <a href={`mailto:${config.assistance}`} className="font-semibold text-marque underline">{config.assistance}</a>.</p>
+          <p className="mt-12 rounded-2xl bg-marque-doux px-5 py-4 text-sm">{t("Besoin d'aide ? Écrivez à")} <a href={`mailto:${config.assistance}`} className="font-semibold text-marque underline">{config.assistance}</a>.</p>
         )}
       </main>
     </div>

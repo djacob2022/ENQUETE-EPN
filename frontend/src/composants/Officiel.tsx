@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { api } from "@/lib/api";
+import { t } from "@/lib/langue";
 import { cx } from "@/ui";
 
 export interface Config {
@@ -16,9 +17,9 @@ export function useConfig() {
 export function Embleme({ className }: { className?: string }) {
   const ecu = `ecu-${useId().replace(/:/g, "")}`;
   const config = useConfig();
-  if (config?.logo) return <img src={config.logo} alt="Logo de l'institution" className={cx("h-10 w-auto max-w-[96px] shrink-0 object-contain", className)} />;
+  if (config?.logo) return <img src={config.logo} alt={t("Logo de l'institution")} className={cx("h-10 w-auto max-w-[96px] shrink-0 object-contain", className)} />;
   return (
-    <svg viewBox="0 0 40 46" className={cx("h-10 w-9 shrink-0", className)} role="img" aria-label="Emblème">
+    <svg viewBox="0 0 40 46" className={cx("h-10 w-9 shrink-0", className)} role="img" aria-label={t("Emblème")}>
       <defs>
         <clipPath id={ecu}><path d="M20 1.5 37.5 7v15.5C37.5 33.5 29.8 41 20 44.5 10.2 41 2.5 33.5 2.5 22.5V7Z" /></clipPath>
       </defs>

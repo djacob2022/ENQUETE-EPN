@@ -1,4 +1,5 @@
 /** Appels à l'API Django (même origine). Le jeton CSRF est lu dans le cookie posé par le serveur. */
+import { langue, t } from "./langue";
 
 export class ErreurApi extends Error {
   constructor(public statut: number, message: string, public erreurs?: Record<string, string[]>) {
@@ -18,7 +19,8 @@ async function assurerCsrf() {
 }
 
 async function requete<T>(methode: string, url: string, corps?: unknown): Promise<T> {
-  const enTetes: Record<string, string> = { Accept: "application/json" };
+  // Langue du répondant (F-16) : le serveur ne la prend en compte que sur les adresses publiques du questionnaire.
+  const enTetes: Record<string, string> = { Accept: "application/json", "X-Langue": langue() };
   let body: BodyInit | undefined;
   if (methode !== "GET") {
     await assurerCsrf();
@@ -33,12 +35,12 @@ async function requete<T>(methode: string, url: string, corps?: unknown): Promis
   try {
     reponse = await fetch(url, { method: methode, headers: enTetes, body, credentials: "same-origin" });
   } catch {
-    throw new ErreurApi(0, "Connexion impossible. Vérifiez votre réseau puis réessayez.");
+    throw new ErreurApi(0, t("Connexion impossible. Vérifiez votre réseau puis réessayez."));
   }
   const type = reponse.headers.get("content-type") ?? "";
   const donnees = type.includes("application/json") ? await reponse.json() : null;
   if (!reponse.ok && !(reponse.status === 422 && donnees?.reponse)) {
-    const message = donnees?.erreur ?? (donnees?.erreurs ? "Certaines réponses sont à corriger." : `Erreur ${reponse.status}`);
+    const message = donnees?.erreur ?? (donnees?.erreurs ? t("Certaines réponses sont à corriger.") : `Erreur ${reponse.status}`);
     throw new ErreurApi(reponse.status, message, donnees?.erreurs);
   }
   return donnees as T;
@@ -58,6 +60,7 @@ export function envoyerFichier<T>(url: string, fichier: File, progression: (p: n
     const xhr = new XMLHttpRequest();
     xhr.open("POST", url);
     xhr.setRequestHeader("X-CSRFToken", decodeURIComponent(cookie("csrftoken")));
+    xhr.setRequestHeader("X-Langue", langue());
     xhr.upload.onprogress = (e) => e.lengthComputable && progression(e.loaded / e.total);
     xhr.onload = () => {
       let donnees: any = null;
@@ -65,7 +68,7 @@ export function envoyerFichier<T>(url: string, fichier: File, progression: (p: n
       if (xhr.status >= 200 && xhr.status < 300) resoudre(donnees as T);
       else rejeter(new ErreurApi(xhr.status, donnees?.erreur ?? `Erreur ${xhr.status}`));
     };
-    xhr.onerror = () => rejeter(new ErreurApi(0, "Connexion impossible."));
+    xhr.onerror = () => rejeter(new ErreurApi(0, t("Connexion impossible.")));
     const corps = new FormData();
     corps.append("fichier", fichier);
     xhr.send(corps);
