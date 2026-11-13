@@ -25,6 +25,8 @@ def tracer(request, action, objet="", auteur=None, **detail):
 
 
 LIBELLES = {
+    "rapport_annuel": "Rapport annuel", "synthese_ia": "Synthèse IA", "assistant_ia": "Question à l'assistant IA",
+    "rapport_auto": "Rapport annuel envoyé automatiquement",
     "connexion": "Connexion", "connexion_echec": "Échec de connexion", "deconnexion": "Déconnexion",
     "mot_de_passe_demande": "Mot de passe oublié", "mot_de_passe_change": "Mot de passe défini",
     "export": "Export", "soumission": "Réponse envoyée par l'EPN", "revue": "Prise en revue", "validation": "Validation",

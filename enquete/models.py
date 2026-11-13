@@ -509,3 +509,26 @@ class DoubleAuthentification(models.Model):
 def double_auth_active(user):
     da = getattr(user, "double_auth", None)
     return bool(da and da.active)
+
+
+class SyntheseIA(models.Model):
+    """Synthèse rédigée par l'assistant IA pour le rapport annuel : conservée pour ne pas solliciter le modèle à chaque
+    téléchargement. Une par campagne, périmètre (tutelles visibles) et base de calcul."""
+
+    campagne = models.ForeignKey(Campagne, on_delete=models.CASCADE, related_name="syntheses_ia")
+    perimetre = models.CharField(max_length=1000, blank=True, help_text="Tutelles couvertes, vide = toutes.")
+    base = models.CharField(max_length=20, default="validees")
+    contenu = models.JSONField(default=dict)
+    nombre_reponses = models.PositiveIntegerField(default=0)
+    modele = models.CharField(max_length=60, blank=True)
+    auteur = models.CharField(max_length=150, blank=True)
+    date = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date"]
+        constraints = [models.UniqueConstraint(fields=["campagne", "perimetre", "base"], name="synthese_ia_unique")]
+        verbose_name = "synthèse IA"
+        verbose_name_plural = "synthèses IA"
+
+    def __str__(self):
+        return f"{self.campagne} · {self.perimetre or 'tous les EPN'} · {self.base}"

@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3, Bell, Building2, CalendarRange, CircleHelp, ClipboardList, CornerDownLeft, History, Inbox, LayoutDashboard, Link2,
-  LogOut, Menu, Search, Settings, UsersRound, X,
+  LogOut, Menu, Search, Settings, Sparkles, UsersRound, X,
 } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
@@ -11,6 +11,7 @@ import { api, avecParams, ErreurApi } from "@/lib/api";
 import { ilYa, initiales } from "@/lib/format";
 import { Campagne, Moi, Notification, Options, Permission, ReponseResume } from "@/lib/types";
 import { Avatar, Bouton, cx, Kbd, Logo, Squelette } from "@/ui";
+import AssistantIA from "./AssistantIA";
 import Campagnes from "./Campagnes";
 import Comptes from "./Comptes";
 import Journal from "./Journal";
@@ -38,6 +39,7 @@ const NAVIGATION: Lien[] = [
   { to: "/gestion/reponses", libelle: "Réponses", icone: Inbox, droit: "voir_nominatif" },
   { to: "/gestion/liens", libelle: "Liens et invitations", icone: Link2, droit: "gerer_liens" },
   { to: "/gestion/statistiques", libelle: "Statistiques", icone: BarChart3 },
+  { to: "/gestion/assistant", libelle: "Assistant IA et rapport", icone: Sparkles },
   { to: "/gestion/epn", libelle: "Répertoire des EPN", icone: Building2, droit: "voir_nominatif" },
   { to: "/gestion/campagnes", libelle: "Campagnes", icone: CalendarRange, section: "Paramétrage" },
   { to: "/gestion/questionnaire", libelle: "Questionnaire", icone: ClipboardList },
@@ -86,6 +88,7 @@ export default function Gestion() {
           <Route path="reponses" element={<Reponses />} />
           <Route path="liens" element={<Liens />} />
           <Route path="statistiques" element={<Statistiques />} />
+          <Route path="assistant" element={<AssistantIA />} />
           <Route path="epn" element={<Repertoire />} />
           <Route path="campagnes" element={<Campagnes />} />
           <Route path="questionnaire" element={<QuestionnaireApercu />} />

@@ -60,4 +60,7 @@ urlpatterns = [
     path("gestion/parametres/", api.parametres, name="parametres"),
     path("gestion/sauvegarde.zip", api.sauvegarde_zip, name="sauvegarde"),
     path("gestion/restauration/", api.restauration, name="restauration"),
+    path("gestion/rapport-annuel.pdf", api.rapport_annuel, name="rapport_annuel"),
+    path("gestion/synthese-ia/", api.synthese_ia, name="synthese_ia"),
+    path("gestion/assistant/", api.assistant_ia, name="assistant_ia"),
 ]
