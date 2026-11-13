@@ -17,6 +17,41 @@ Règles de cohérence (F-12) : {"type": "somme", "total": "D01", "parties": ["D0
 import copy
 
 OUI_NON = [["oui", "Oui"], ["non", "Non"]]
+OUI_NON_EN = [["oui", "Yes"], ["non", "No"]]
+CHAMPS_TRADUITS = ("libelle", "aide", "unite", "libelle_min", "libelle_max")
+
+
+def oui_non():
+    from .langue import anglais
+
+    return OUI_NON_EN if anglais() else OUI_NON
+
+
+def traduire(definition):
+    """Copie anglaise d'une définition (F-16) : champs « _en » saisis dans l'éditeur, sinon traduction du questionnaire
+    par défaut, sinon texte français (repli)."""
+    from .questionnaire_en import EN
+
+    def t(objet, cle):
+        texte = objet.get(cle)
+        return objet.get(f"{cle}_en") or (EN.get(texte, texte) if texte else texte)
+
+    d = copy.deepcopy(definition)
+    for m in d.get("modules", []):
+        m["titre"], m["intro"] = t(m, "titre"), t(m, "intro")
+        for q in m.get("questions", []):
+            for cle in CHAMPS_TRADUITS:
+                if q.get(cle):
+                    q[cle] = t(q, cle)
+            if q.get("choix"):
+                traduits = q.get("choix_en") or {}
+                q["choix"] = [[v, traduits.get(v) or EN.get(lib, lib)] for v, lib in q["choix"]]
+            for c in q.get("colonnes") or []:
+                c["libelle"] = t(c, "libelle")
+    for r in d.get("regles", []):
+        if r.get("message"):
+            r["message"] = r.get("message_en") or None
+    return d
 
 TYPES = {
     "texte": "Texte court", "texte_long": "Texte long", "entier": "Nombre entier", "montant": "Montant",
@@ -218,6 +253,9 @@ class Questionnaire:
     def __init__(self, definition=None):
         self.definition = definition or definition_par_defaut()
 
+    def en_anglais(self):
+        return Questionnaire(traduire(self.definition))
+
     @property
     def version(self):
         return self.definition.get("version", 1)
@@ -276,6 +314,9 @@ class Questionnaire:
                 if t is None or any(v is None for v in valeurs) or sum(valeurs) == t:
                     return None
                 noms = " + ".join(self._libelle(p) for p in parties)
+                if not regle.get("message") and _en():
+                    return (f"{noms[:1].upper()}{noms[1:]} = {_milliers(sum(valeurs))}, which differs from "
+                            f"“{self._libelle(total)}” ({_milliers(t)}).")
                 return regle.get("message") or (
                     f"{noms[:1].upper()}{noms[1:]} = {_milliers(sum(valeurs))}, différent de « {self._libelle(total)} » "
                     f"({_milliers(t)}).")
@@ -287,6 +328,9 @@ class Questionnaire:
                 a, b = _nombre(d.get(petit)), _nombre(d.get(grand))
                 if a is None or b is None or a <= b:
                     return None
+                if not regle.get("message") and _en():
+                    nom = self._libelle(petit)
+                    return f"“{nom[:1].upper()}{nom[1:]}” cannot exceed “{self._libelle(grand)}”."
                 return regle.get("message") or (
                     f"« {self._libelle(petit)[:1].upper()}{self._libelle(petit)[1:]} » ne peut pas dépasser "
                     f"« {self._libelle(grand)} ».")
@@ -294,12 +338,18 @@ class Questionnaire:
         return [], None
 
 
+def _en():
+    from .langue import anglais
+
+    return anglais()
+
+
 def libelle_reponse(q, valeur):
     """Valeur lisible pour l'affichage et l'export Excel."""
     if valeur in (None, "", []):
         return ""
     if q["type"] == "oui_non":
-        return dict(OUI_NON).get(valeur, valeur)
+        return dict(oui_non()).get(valeur, valeur)
     if q["type"] == "choix":
         return dict(map(tuple, q["choix"])).get(valeur, valeur)
     if q["type"] == "choix_multiple":

@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { api, ErreurApi } from "@/lib/api";
 import { nombre } from "@/lib/format";
+import { t } from "@/lib/langue";
 import { Module, ReponsePublique, Valeur } from "@/lib/types";
 import { Bouton, Carte, cx, useToast } from "@/ui";
-import { ChampQuestion, CommentaireTutelle, DepotFichier, estPosee, versEnvoi } from "./Questions";
+import { ChampQuestion, CommentaireTutelle, DepotFichier, estPosee, nettoyerNombre, versEnvoi } from "./Questions";
 import { urlApi, useFormulaire } from "./Formulaire";
 
 type Valeurs = Record<string, Valeur>;
@@ -95,7 +96,7 @@ function FormulaireRubrique({ module, index, donnees }: { module: Module; index:
   function signaler(e: Record<string, string[]>) {
     setErreurs(e);
     const n = Object.keys(e).length;
-    toast("erreur", n > 1 ? `${n} réponses sont à compléter ou à corriger.` : "Une réponse est à compléter ou à corriger.");
+    toast("erreur", n > 1 ? t("{n} réponses sont à compléter ou à corriger.", { n }) : t("Une réponse est à compléter ou à corriger."));
     requestAnimationFrame(() => document.querySelector("[data-erreur='true']")?.scrollIntoView({ behavior: "smooth", block: "center" }));
   }
 
@@ -117,7 +118,7 @@ function FormulaireRubrique({ module, index, donnees }: { module: Module; index:
       const r = await api.post<{ repris: number; exercice: number; reponse: ReponsePublique }>(urlApi(jeton, `modules/${module.code}/preremplir/`));
       mettreAJour(r.reponse);
       setValeurs(valeursInitiales(module, r.reponse.donnees));
-      toast("succes", r.repris ? `${r.repris} réponse${r.repris > 1 ? "s" : ""} reprise${r.repris > 1 ? "s" : ""} de l'exercice ${r.exercice}. Vérifiez-les et mettez-les à jour.` : "Rien à reprendre pour cette rubrique.");
+      toast("succes", r.repris ? t("{n} réponse(s) reprise(s) de l'exercice {exercice}. Vérifiez-les et mettez-les à jour.", { n: r.repris, exercice: r.exercice }) : t("Rien à reprendre pour cette rubrique."));
     } catch (e) {
       toast("erreur", (e as ErreurApi).message);
     } finally {
@@ -129,12 +130,12 @@ function FormulaireRubrique({ module, index, donnees }: { module: Module; index:
     <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
       className="mx-auto max-w-3xl">
       <div className="mb-6">
-        <p className="text-sm font-medium text-marque">Rubrique {module.code} · {index + 1} sur {total}</p>
+        <p className="text-sm font-medium text-marque">{t("Rubrique {code} · {n} sur {total}", { code: module.code, n: index + 1, total })}</p>
         <h1 className="titre-display mt-1 text-4xl sm:text-[44px]">{module.titre}</h1>
         {module.intro && <p className="mt-2 max-w-2xl text-discret">{module.intro}</p>}
         {reponse.precedente && module.questions.some((q) => q.type !== "fichier") && (
           <Bouton taille="sm" className="mt-4" chargement={reprise} onClick={reprendre}>
-            <History className="h-4 w-4" /> Reprendre mes réponses de l'exercice {reponse.precedente}
+            <History className="h-4 w-4" /> {t("Reprendre mes réponses de l'exercice {exercice}", { exercice: reponse.precedente })}
           </Bouton>
         )}
       </div>
@@ -142,7 +143,7 @@ function FormulaireRubrique({ module, index, donnees }: { module: Module; index:
       {aCorriger > 0 && (
         <div className="mb-4 flex gap-3 rounded-2xl border border-danger/30 bg-danger-doux p-4 text-sm">
           <MessageSquareWarning className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
-          <p><strong className="text-danger">La tutelle demande {aCorriger > 1 ? `${aCorriger} corrections` : "une correction"} dans cette rubrique.</strong> Les questions concernées sont signalées ci-dessous.</p>
+          <p><strong className="text-danger">{aCorriger > 1 ? t("La tutelle demande {n} corrections dans cette rubrique.", { n: aCorriger }) : t("La tutelle demande une correction dans cette rubrique.")}</strong> {t("Les questions concernées sont signalées ci-dessous.")}</p>
         </div>
       )}
 
@@ -176,10 +177,10 @@ function FormulaireRubrique({ module, index, donnees }: { module: Module; index:
       </Carte>
 
       <div className="sticky bottom-4 z-20 mt-6 flex items-center gap-3 rounded-2xl border border-trait bg-surface/90 p-3 shadow-flottant backdrop-blur-xl">
-        <Bouton variante="fantome" onClick={precedent}><ArrowLeft className="h-4 w-4" /> Précédent</Bouton>
-        <span className="hidden flex-1 text-center text-xs text-discret sm:block">Vos réponses sont enregistrées automatiquement.</span>
+        <Bouton variante="fantome" onClick={precedent}><ArrowLeft className="h-4 w-4" /> {t("Précédent")}</Bouton>
+        <span className="hidden flex-1 text-center text-xs text-discret sm:block">{t("Vos réponses sont enregistrées automatiquement.")}</span>
         <Bouton variante="primaire" className="ml-auto" chargement={envoi} onClick={suivant}>
-          {index + 1 === total ? "Vérifier et envoyer" : "Suivant"} <ArrowRight className="h-4 w-4" />
+          {index + 1 === total ? t("Vérifier et envoyer") : t("Suivant")} <ArrowRight className="h-4 w-4" />
         </Bouton>
       </div>
     </motion.div>
@@ -188,32 +189,33 @@ function FormulaireRubrique({ module, index, donnees }: { module: Module; index:
 
 /** Garde seulement les erreurs « de format » : les obligatoires ne s'affichent qu'au clic sur Suivant. */
 function filtrerFormat(e: Record<string, string[]>) {
-  return Object.fromEntries(Object.entries(e).filter(([, m]) => !m.some((x) => x.includes("obligatoire"))));
+  // Messages « obligatoire » du serveur, en français ou en anglais (« This field is required. »).
+  return Object.fromEntries(Object.entries(e).filter(([, m]) => !m.some((x) => x.includes("obligatoire") || x.includes("required"))));
 }
 
 /** Aides visuelles calculées pendant la saisie, avant même la validation par le serveur. */
 function controlesEnDirect(code: string, v: Valeurs) {
-  const n = (c: string) => (v[c] === "" || v[c] === undefined ? null : Number(String(v[c]).replace(/\s/g, "").replace(",", ".")));
+  const n = (c: string) => (v[c] === "" || v[c] === undefined ? null : Number(nettoyerNombre(String(v[c]))));
   const res: { ok: boolean; texte: string }[] = [];
   const somme = (total: string, a: string, b: string, libelle: string) => {
-    const [t, x, y] = [n(total), n(a), n(b)];
-    if (t === null || x === null || y === null || [t, x, y].some(Number.isNaN)) return;
-    res.push(x + y === t ? { ok: true, texte: `${libelle} = effectif total` }
-      : { ok: false, texte: `${libelle} = ${nombre(x + y)}, effectif total ${nombre(t)}` });
+    const [tot, x, y] = [n(total), n(a), n(b)];
+    if (tot === null || x === null || y === null || [tot, x, y].some(Number.isNaN)) return;
+    res.push(x + y === tot ? { ok: true, texte: t("{libelle} = effectif total", { libelle }) }
+      : { ok: false, texte: t("{libelle} = {somme}, effectif total {total}", { libelle, somme: nombre(x + y), total: nombre(tot) }) });
   };
   if (code === "D") {
-    somme("D01", "D02", "D03", "Femmes + hommes");
-    somme("D01", "D04", "D05", "Fonctionnaires + contractuels");
+    somme("D01", "D02", "D03", t("Femmes + hommes"));
+    somme("D01", "D04", "D05", t("Fonctionnaires + contractuels"));
   }
   if (code === "G") {
     const [suivis, atteints] = [n("G01"), n("G02")];
     if (suivis !== null && atteints !== null && suivis > 0)
-      res.push(atteints <= suivis ? { ok: true, texte: `${Math.round((100 * atteints) / suivis)} % des indicateurs atteints` }
-        : { ok: false, texte: "Plus d'indicateurs atteints que suivis" });
+      res.push(atteints <= suivis ? { ok: true, texte: t("{n} % des indicateurs atteints", { n: Math.round((100 * atteints) / suivis) }) }
+        : { ok: false, texte: t("Plus d'indicateurs atteints que suivis") });
   }
   if (code === "E") {
     const [prevu, execute] = [n("E01"), n("E02")];
-    if (prevu && execute !== null) res.push({ ok: execute <= prevu * 1.2, texte: `Exécution budgétaire : ${Math.round((100 * execute) / prevu)} %` });
+    if (prevu && execute !== null) res.push({ ok: execute <= prevu * 1.2, texte: t("Exécution budgétaire : {n} %", { n: Math.round((100 * execute) / prevu) }) });
   }
   return res;
 }

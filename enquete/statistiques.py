@@ -2,7 +2,7 @@
 import statistics
 from collections import Counter, defaultdict
 
-from .questionnaire import OUI_NON, TYPES_NUMERIQUES
+from .questionnaire import oui_non, TYPES_NUMERIQUES
 
 
 def descriptifs(valeurs):
@@ -44,7 +44,7 @@ def histogramme(valeurs, classes=6):
 
 def choix_de(q):
     if q["type"] == "oui_non":
-        return OUI_NON
+        return oui_non()
     if q["type"] == "echelle":
         return [[v, str(v)] for v in range(int(q.get("min", 1)), int(q.get("max", 5)) + 1)]
     return q.get("choix", [])

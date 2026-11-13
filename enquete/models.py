@@ -128,9 +128,11 @@ class Campagne(models.Model):
 
     @property
     def q(self):
+        from .langue import anglais
         from .questionnaire import Questionnaire
 
-        return Questionnaire(self.questionnaire)
+        q = Questionnaire(self.questionnaire)
+        return q.en_anglais() if anglais() else q  # parcours du répondant en anglais (F-16)
 
     @property
     def liste_cible_tutelles(self):
@@ -192,6 +194,8 @@ class Reponse(models.Model):
     epn = models.ForeignKey(EPN, on_delete=models.CASCADE, related_name="reponses")
     jeton = models.CharField(max_length=64, unique=True, default=nouveau_jeton, editable=False)
     statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.INVITE)
+    langue = models.CharField("langue du répondant", max_length=2, default="fr",
+                              choices=[("fr", "Français"), ("en", "English")])
 
     # Identification du répondant, saisie à l'ouverture du lien.
     nom = models.CharField(max_length=120, blank=True)

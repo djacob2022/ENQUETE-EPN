@@ -3,6 +3,7 @@ import { Check, Download, FileText, MessageSquareWarning, Plus, RefreshCw, Trash
 import { useId, useRef, useState } from "react";
 import { api, envoyerFichier, ErreurApi } from "@/lib/api";
 import { compacte, date, nombre, taille } from "@/lib/format";
+import { langue, t } from "@/lib/langue";
 import { LigneTableau, Module, Piece, Question, ReponsePublique, Valeur } from "@/lib/types";
 import { Bouton, cx, Etiquette, MessageChamp, useToast } from "@/ui";
 import { urlApi, useFormulaire } from "./Formulaire";
@@ -10,7 +11,11 @@ import { urlApi, useFormulaire } from "./Formulaire";
 /* ---------- Conversion des saisies ---------- */
 
 const numerique = (t: string) => ["entier", "montant", "pourcentage"].includes(t);
-const nettoyerNombre = (v: string) => v.replace(/[\s\u00a0\u202f]/g, "").replace(",", ".");
+/** « 1 250 000,50 » (français) ou « 1,250,000.50 » (anglais) → « 1250000.50 ». */
+export const nettoyerNombre = (v: string) => {
+  const s = v.replace(/[\s\u00a0\u202f]/g, "");
+  return langue() === "en" ? s.replace(/,/g, "") : s.replace(",", ".");
+};
 
 /** Vrai si la question est posée, compte tenu des réponses déjà données (condition d'affichage). */
 export function estPosee(q: Question, valeurs: Record<string, Valeur>) {
@@ -26,7 +31,7 @@ export function CommentaireTutelle({ texte }: { texte?: string }) {
   return (
     <div className="mb-3 flex gap-2.5 rounded-xl border border-danger/25 bg-danger-doux/60 px-4 py-3 text-sm">
       <MessageSquareWarning className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
-      <p><span className="font-semibold text-danger">Correction demandée : </span>{texte}</p>
+      <p><span className="font-semibold text-danger">{t("Correction demandée : ")}</span>{texte}</p>
     </div>
   );
 }
@@ -109,7 +114,7 @@ export function ChampQuestion({ question: q, valeur, erreurs, changer }: {
     return (
       <fieldset aria-describedby={`${id}-m`}>
         <legend className="mb-3"><Etiquette code={q.code} obligatoire={q.obligatoire}>{q.libelle}</Etiquette></legend>
-        {multiple && <p className="-mt-1.5 mb-3 text-[13px] text-discret">Plusieurs réponses possibles.</p>}
+        {multiple && <p className="-mt-1.5 mb-3 text-[13px] text-discret">{t("Plusieurs réponses possibles.")}</p>}
         <div className={cx("grid gap-2", q.type === "oui_non" ? "max-w-sm grid-cols-2" : "sm:grid-cols-2")}>
           {q.choix!.map((c) => {
             const actif = choisis.includes(c.valeur);
@@ -151,7 +156,7 @@ export function ChampQuestion({ question: q, valeur, erreurs, changer }: {
   const estNombre = numerique(q.type);
   const brut = estNombre ? Number(nettoyerNombre(texte)) : NaN;
   const apercu = q.type === "montant" && texte && !Number.isNaN(brut) && brut >= 10000 ? `≈ ${compacte(brut)}` : null;
-  const suffixe = q.type === "pourcentage" ? "%" : q.unite ?? (q.type === "montant" ? "monnaie locale" : undefined);
+  const suffixe = q.type === "pourcentage" ? "%" : q.unite ?? (q.type === "montant" ? t("monnaie locale") : undefined);
 
   return (
     <div className="flex flex-col gap-2">
@@ -159,12 +164,12 @@ export function ChampQuestion({ question: q, valeur, erreurs, changer }: {
       <div className={cx("relative", estNombre && "max-w-sm")}>
         <input id={id} value={texte} onChange={(e) => changer(e.target.value)} aria-invalid={enErreur}
           type={q.type === "url" ? "url" : "text"} inputMode={q.type === "entier" ? "numeric" : estNombre ? "decimal" : undefined}
-          placeholder={q.type === "url" ? "https://" : q.annee ? "AAAA" : ""}
+          placeholder={q.type === "url" ? "https://" : q.annee ? t("AAAA") : ""}
           className={cx(bordure, "h-12", estNombre && "chiffres text-right")} style={suffixe ? { paddingRight: `${suffixe.length * 7.5 + 28}px` } : undefined} />
         {suffixe && <span className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center text-[13px] text-discret">{suffixe}</span>}
       </div>
       <div className="flex gap-3">
-        <MessageChamp erreurs={erreurs} aide={q.aide ?? (q.min !== undefined && q.max !== undefined && !q.annee ? `Entre ${nombre(q.min)} et ${nombre(q.max)}.` : undefined)} />
+        <MessageChamp erreurs={erreurs} aide={q.aide ?? (q.min !== undefined && q.max !== undefined && !q.annee ? t("Entre {min} et {max}.", { min: nombre(q.min), max: nombre(q.max) }) : undefined)} />
         {apercu && !erreurs?.length && <span className="text-[13px] font-medium text-marque">{apercu}</span>}
       </div>
     </div>
@@ -196,13 +201,13 @@ function ChampTableau({ question: q, valeur, erreurs, changer }: {
                 {colonnes.map((c) => (
                   <td key={c.code} className="p-1.5">
                     <input value={String(l[c.code] ?? "")} onChange={(e) => maj(i, c.code, e.target.value)}
-                      aria-label={`${c.libelle}, ligne ${i + 1}`} inputMode={c.type === "nombre" ? "decimal" : undefined}
+                      aria-label={t("{colonne}, ligne {n}", { colonne: c.libelle, n: i + 1 })} inputMode={c.type === "nombre" ? "decimal" : undefined}
                       className={cx("h-10 w-full rounded-lg border border-transparent bg-transparent px-2.5 focus:border-marque focus:bg-surface focus:outline-none",
                         c.type === "nombre" && "chiffres text-right")} />
                   </td>
                 ))}
                 <td className="p-1.5">
-                  <button type="button" onClick={() => changer(affichees.filter((_, j) => j !== i))} aria-label={`Supprimer la ligne ${i + 1}`}
+                  <button type="button" onClick={() => changer(affichees.filter((_, j) => j !== i))} aria-label={t("Supprimer la ligne {n}", { n: i + 1 })}
                     className="grid h-9 w-9 place-items-center rounded-lg text-discret hover:bg-danger-doux hover:text-danger"><X className="h-4 w-4" /></button>
                 </td>
               </tr>
@@ -212,7 +217,7 @@ function ChampTableau({ question: q, valeur, erreurs, changer }: {
       </div>
       <div className="flex items-center gap-3">
         <Bouton taille="sm" variante="secondaire" disabled={affichees.length >= 20} onClick={() => changer([...affichees, vide()])}>
-          <Plus className="h-4 w-4" /> Ajouter une ligne
+          <Plus className="h-4 w-4" /> {t("Ajouter une ligne")}
         </Bouton>
         <span className="text-xs text-discret">{affichees.length} / 20</span>
       </div>
@@ -239,8 +244,8 @@ export function DepotFichier({ question: q, piece, erreurs, effacerErreur }: {
 
   async function deposer(f: File) {
     const ext = "." + (f.name.split(".").pop() ?? "").toLowerCase();
-    if (!extensions(accept).includes(ext)) return setErreurLocale("Format non accepté : PDF, Word, Excel, JPG ou PNG.");
-    if (f.size > taille_max) return setErreurLocale(`Fichier trop volumineux (${taille(f.size)}). Maximum : ${taille(taille_max)}.`);
+    if (!extensions(accept).includes(ext)) return setErreurLocale(t("Format non accepté : PDF, Word, Excel, JPG ou PNG."));
+    if (f.size > taille_max) return setErreurLocale(t("Fichier trop volumineux ({taille}). Maximum : {max}.", { taille: taille(f.size), max: taille(taille_max) }));
     setErreurLocale(undefined);
     effacerErreur();
     setProgres(0);
@@ -248,7 +253,7 @@ export function DepotFichier({ question: q, piece, erreurs, effacerErreur }: {
     try {
       mettreAJour(await envoyerFichier<ReponsePublique>(url, f, setProgres));
       setSauvegarde("enregistre");
-      toast("succes", `« ${f.name} » déposé.`);
+      toast("succes", t("« {nom} » déposé.", { nom: f.name }));
     } catch (e) {
       setSauvegarde("erreur");
       setErreurLocale((e as ErreurApi).message);
@@ -260,7 +265,7 @@ export function DepotFichier({ question: q, piece, erreurs, effacerErreur }: {
   async function supprimer() {
     try {
       mettreAJour(await api.delete<ReponsePublique>(url));
-      toast("info", "Fichier supprimé.");
+      toast("info", t("Fichier supprimé."));
     } catch (e) {
       toast("erreur", (e as ErreurApi).message);
     }
@@ -281,12 +286,12 @@ export function DepotFichier({ question: q, piece, erreurs, effacerErreur }: {
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-surface text-succes shadow-sm"><FileText className="h-5 w-5" /></span>
             <div className="min-w-0 flex-1">
               <a href={piece.url} className="block truncate font-medium text-encre hover:underline">{piece.nom}</a>
-              <p className="text-xs text-discret">{taille(piece.taille)} · déposé le {date(piece.date_depot, true)}</p>
+              <p className="text-xs text-discret">{taille(piece.taille)} · {t("déposé le {date}", { date: date(piece.date_depot, true) })}</p>
             </div>
             <div className="flex gap-1">
-              <a href={piece.url} className="grid h-9 w-9 place-items-center rounded-lg text-discret hover:bg-surface hover:text-encre" aria-label="Télécharger"><Download className="h-4 w-4" /></a>
-              <Bouton variante="fantome" taille="sm" onClick={() => champ.current?.click()} aria-label="Remplacer"><RefreshCw className="h-4 w-4" /></Bouton>
-              <Bouton variante="fantome" taille="sm" onClick={supprimer} aria-label="Supprimer" className="hover:text-danger"><Trash2 className="h-4 w-4" /></Bouton>
+              <a href={piece.url} className="grid h-9 w-9 place-items-center rounded-lg text-discret hover:bg-surface hover:text-encre" aria-label={t("Télécharger")}><Download className="h-4 w-4" /></a>
+              <Bouton variante="fantome" taille="sm" onClick={() => champ.current?.click()} aria-label={t("Remplacer")}><RefreshCw className="h-4 w-4" /></Bouton>
+              <Bouton variante="fantome" taille="sm" onClick={supprimer} aria-label={t("Supprimer")} className="hover:text-danger"><Trash2 className="h-4 w-4" /></Bouton>
             </div>
           </motion.div>
         ) : (
@@ -298,7 +303,7 @@ export function DepotFichier({ question: q, piece, erreurs, effacerErreur }: {
               survol ? "border-marque bg-marque-doux/60" : messages?.length ? "border-danger/50 bg-danger-doux/30" : "border-trait bg-relief/40 hover:border-marque/50 hover:bg-marque-doux/30")}>
             {progres !== null ? (
               <>
-                <span className="text-sm font-medium">Envoi en cours… {Math.round(progres * 100)} %</span>
+                <span className="text-sm font-medium">{t("Envoi en cours… {n} %", { n: Math.round(progres * 100) })}</span>
                 <div className="h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-trait">
                   <motion.div className="h-full bg-marque" animate={{ width: `${progres * 100}%` }} />
                 </div>
@@ -306,8 +311,8 @@ export function DepotFichier({ question: q, piece, erreurs, effacerErreur }: {
             ) : (
               <>
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-surface text-marque shadow-sm"><UploadCloud className="h-5 w-5" /></span>
-                <span className="text-sm"><span className="font-semibold text-marque">Choisissez un fichier</span> ou glissez-le ici</span>
-                <span className="text-xs text-discret">PDF, Word, Excel, JPG ou PNG · {taille(taille_max)} maximum</span>
+                <span className="text-sm"><span className="font-semibold text-marque">{t("Choisissez un fichier")}</span> {t("ou glissez-le ici")}</span>
+                <span className="text-xs text-discret">{t("PDF, Word, Excel, JPG ou PNG · {max} maximum", { max: taille(taille_max) })}</span>
               </>
             )}
           </motion.button>

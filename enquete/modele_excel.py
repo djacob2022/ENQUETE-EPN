@@ -7,19 +7,48 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill, Protection
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from .questionnaire import OUI_NON, TYPES
+from .questionnaire import OUI_NON, OUI_NON_EN, TYPES, oui_non
 
 ENTETE = Font(bold=True, color="FFFFFF")
 FOND = PatternFill("solid", fgColor="073625")
 SAISIE = PatternFill("solid", fgColor="FFF8E6")
 COLONNES = ["Rubrique", "Code", "Question", "Type", "Obligatoire", "Choix possibles / aide", "Votre réponse"]
+TYPES_EN = {"texte": "Short text", "texte_long": "Long text", "entier": "Whole number", "montant": "Amount",
+            "pourcentage": "Percentage", "date": "Date", "choix": "Single choice", "choix_multiple": "Multiple choice",
+            "oui_non": "Yes / no", "echelle": "Scale", "tableau": "Repeating table", "url": "Web address",
+            "fichier": "Attached file"}
+TEXTES_EN = {
+    "Lisez-moi": "Read me", "Rubrique": "Section", "Type": "Type", "Obligatoire": "Required",
+    "Choix possibles / aide": "Possible choices / help", "Votre réponse": "Your answer", "oui": "yes", "non": "no",
+    "À compléter en ligne": "To be completed online", "Valeur non prévue": "Unexpected value",
+    "Choisissez une valeur dans la liste.": "Choose a value from the list.",
+    "1. Remplissez uniquement la colonne « Votre réponse » (en jaune) de la feuille « Questionnaire ».":
+        "1. Only fill in the “Your answer” column (in yellow) of the “Questionnaire” sheet.",
+    "2. Pour les listes, choisissez dans le menu déroulant. Choix multiples : séparez par « ; ».":
+        "2. For lists, choose from the drop-down menu. Multiple choices: separate with “;”.",
+    "3. Montants et nombres : chiffres seuls, sans unité. Dates : JJ/MM/AAAA.":
+        "3. Amounts and numbers: digits only, no unit. Dates: DD/MM/YYYY.",
+    "4. Les tableaux et les pièces justificatives se complètent en ligne.":
+        "4. Tables and supporting documents are completed online.",
+    "5. Revenez sur votre lien personnel, puis « Importer le fichier Excel » : vos réponses sont vérifiées "
+    "et enregistrées en brouillon. Relisez et envoyez en ligne.":
+        "5. Go back to your personal link, then “Import the Excel file”: your answers are checked and saved as a "
+        "draft. Review and submit online.",
+    "Ne modifiez ni les codes ni l'ordre des lignes.": "Do not change the codes or the order of the rows.",
+}
+
+
+def _x(texte):
+    from .langue import anglais
+
+    return TEXTES_EN.get(texte, texte) if anglais() else texte
 NON_IMPORTABLES = {"fichier", "tableau"}
 SEPARATEUR = " ; "
 
 
 def _choix(q):
     if q["type"] == "oui_non":
-        return OUI_NON
+        return oui_non()
     return q.get("choix", [])
 
 
@@ -40,26 +69,28 @@ def _valeur_cellule(q, v):
 
 
 def generer(reponse):
+    from .langue import anglais
+
     q = reponse.campagne.q
     wb = Workbook()
     lisez = wb.active
-    lisez.title = "Lisez-moi"
+    lisez.title = _x("Lisez-moi")
     for ligne in [
         [f"Questionnaire {reponse.campagne.nom} – {reponse.epn.nom}"], [],
-        ["1. Remplissez uniquement la colonne « Votre réponse » (en jaune) de la feuille « Questionnaire »."],
-        ["2. Pour les listes, choisissez dans le menu déroulant. Choix multiples : séparez par « ; »."],
-        ["3. Montants et nombres : chiffres seuls, sans unité. Dates : JJ/MM/AAAA."],
-        ["4. Les tableaux et les pièces justificatives se complètent en ligne."],
-        ["5. Revenez sur votre lien personnel, puis « Importer le fichier Excel » : vos réponses sont vérifiées "
-         "et enregistrées en brouillon. Relisez et envoyez en ligne."],
-        [], ["Ne modifiez ni les codes ni l'ordre des lignes."],
+        [_x("1. Remplissez uniquement la colonne « Votre réponse » (en jaune) de la feuille « Questionnaire ».")],
+        [_x("2. Pour les listes, choisissez dans le menu déroulant. Choix multiples : séparez par « ; ».")],
+        [_x("3. Montants et nombres : chiffres seuls, sans unité. Dates : JJ/MM/AAAA.")],
+        [_x("4. Les tableaux et les pièces justificatives se complètent en ligne.")],
+        [_x("5. Revenez sur votre lien personnel, puis « Importer le fichier Excel » : vos réponses sont vérifiées "
+         "et enregistrées en brouillon. Relisez et envoyez en ligne.")],
+        [], [_x("Ne modifiez ni les codes ni l'ordre des lignes.")],
     ]:
         lisez.append(ligne)
     lisez["A1"].font = Font(bold=True, size=13, color="073625")
     lisez.column_dimensions["A"].width = 110
 
     ws = wb.create_sheet("Questionnaire")
-    ws.append(COLONNES)
+    ws.append([_x(c) for c in COLONNES])
     for c in ws[1]:
         c.font, c.fill = ENTETE, FOND
         c.alignment = Alignment(vertical="center", wrap_text=True)
@@ -67,15 +98,18 @@ def generer(reponse):
     for module, question in q.questions():
         t = question["type"]
         if t in NON_IMPORTABLES:
-            aide = "À compléter en ligne"
+            aide = _x("À compléter en ligne")
         elif t in ("choix", "oui_non", "choix_multiple"):
             aide = SEPARATEUR.join(l for _, l in _choix(question))
         elif t == "echelle":
-            aide = f"Nombre de {question.get('min', 1)} à {question.get('max', 5)}"
+            aide = (f"Number from {question.get('min', 1)} to {question.get('max', 5)}" if anglais() else
+                    f"Nombre de {question.get('min', 1)} à {question.get('max', 5)}")
         else:
-            aide = question.get("aide") or (f"En {question['unite']}" if question.get("unite") else "")
-        ws.append([f"{module['code']}. {module['titre']}", question["code"], question["libelle"], TYPES.get(t, t),
-                   "oui" if question.get("obligatoire", True) else "non", aide,
+            aide = question.get("aide") or (f"{'In' if anglais() else 'En'} {question['unite']}"
+                                            if question.get("unite") else "")
+        ws.append([f"{module['code']}. {module['titre']}", question["code"], question["libelle"],
+                   (TYPES_EN if anglais() else TYPES).get(t, t), _x("oui" if question.get("obligatoire", True) else "non"),
+                   aide,
                    None if t in NON_IMPORTABLES else _valeur_cellule(question, reponse.donnees.get(question["code"]))])
         cellule = ws.cell(row=ws.max_row, column=7)
         if t in NON_IMPORTABLES:
@@ -90,7 +124,7 @@ def generer(reponse):
                 listes.setdefault(options, []).append(cellule.coordinate)
     for options, cellules in listes.items():
         dv = DataValidation(type="list", formula1=options, allow_blank=True, showErrorMessage=True,
-                            errorTitle="Valeur non prévue", error="Choisissez une valeur dans la liste.")
+                            errorTitle=_x("Valeur non prévue"), error=_x("Choisissez une valeur dans la liste."))
         ws.add_data_validation(dv)
         for c in cellules:
             dv.add(c)
@@ -122,7 +156,14 @@ def _depuis_cellule(q, v):
         except ValueError:
             return v.strip()
     if t in ("choix", "oui_non", "choix_multiple"):
-        par_libelle = {l.strip().lower(): c for c, l in _choix(q)}
+        # Libellés français et anglais acceptés : le fichier peut avoir été téléchargé dans l'autre langue (F-16).
+        from .questionnaire_en import EN
+
+        inverse = {v: k for k, v in EN.items()}
+        par_libelle = {}
+        for c, l in _choix(q) + (OUI_NON + OUI_NON_EN if t == "oui_non" else []):
+            for variante in (l, EN.get(l, l), inverse.get(l, l)):
+                par_libelle.setdefault(variante.strip().lower(), c)
         codes = {c.lower(): c for c, _ in _choix(q)}
         morceaux = [m.strip() for m in str(v).split(";")] if t == "choix_multiple" else [str(v).strip()]
         valeurs = [par_libelle.get(m.lower()) or codes.get(m.lower()) or m for m in morceaux if m]

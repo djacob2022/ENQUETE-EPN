@@ -2,7 +2,7 @@
 from django.urls import reverse
 
 from .pieces import ACCEPT, TAILLE_MAX
-from .questionnaire import OUI_NON, TYPES, TYPES_NUMERIQUES, affichage
+from .questionnaire import CHAMPS_TRADUITS, TYPES, TYPES_NUMERIQUES, affichage, oui_non
 from .services import etat, reponse_precedente
 
 
@@ -10,16 +10,35 @@ def _date(d):
     return d.isoformat() if d else None
 
 
-def question(q):
+def _en(objet, cle):
+    """Version anglaise affichée dans l'éditeur : celle saisie, sinon la traduction automatique du texte par défaut."""
+    from .questionnaire_en import EN
+
+    return objet.get(f"{cle}_en") or EN.get(objet.get(cle) or "", "")
+
+
+def question(q, editeur=False):
     item = {k: q[k] for k in ("code", "libelle", "type")}
     item["obligatoire"] = q.get("obligatoire", True)
     for cle in ("min", "max", "unite", "aide", "annee", "si", "colonnes", "libelle_min", "libelle_max"):
         if cle in q:
             item[cle] = q[cle]
     if q["type"] == "oui_non":
-        item["choix"] = [{"valeur": v, "libelle": l} for v, l in OUI_NON]
+        item["choix"] = [{"valeur": v, "libelle": l} for v, l in oui_non()]
     elif "choix" in q:
         item["choix"] = [{"valeur": v, "libelle": l} for v, l in q["choix"]]
+    if editeur:  # F-16 : champs de la version anglaise
+        for cle in CHAMPS_TRADUITS:
+            if q.get(cle):
+                item[f"{cle}_en"] = _en(q, cle)
+        if q["type"] != "oui_non" and "choix" in item:
+            from .questionnaire_en import EN
+
+            traduits = q.get("choix_en") or {}
+            for c in item["choix"]:
+                c["libelle_en"] = traduits.get(c["valeur"]) or EN.get(c["libelle"], "")
+        if "colonnes" in item:
+            item["colonnes"] = [c | {"libelle_en": _en(c, "libelle")} for c in item["colonnes"]]
     return item
 
 
@@ -27,7 +46,8 @@ def questionnaire(campagne_obj, tous=False):
     """Questionnaire d'une campagne. `tous` : modules désactivés compris (éditeur)."""
     q = campagne_obj.q
     modules = [{"code": m["code"], "titre": m["titre"], "intro": m.get("intro", ""), "actif": m.get("actif", True),
-                "questions": [question(x) for x in m["questions"]]}
+                "questions": [question(x, editeur=tous) for x in m["questions"]]}
+               | ({"titre_en": _en(m, "titre"), "intro_en": _en(m, "intro")} if tous else {})
                for m in (q.tous_les_modules if tous else q.modules)]
     sortie = {"modules": modules, "version": q.version, "fichiers": {"accept": ACCEPT, "taille_max": TAILLE_MAX}}
     if tous:
@@ -71,6 +91,7 @@ def reponse_publique(r):
     return {
         "etat": etat(r),
         "statut": r.statut,
+        "langue": r.langue,
         "epn": {"nom": r.epn.nom, "sigle": r.epn.sigle, "categorie": r.epn.categorie, "tutelle": r.epn.tutelle},
         "campagne": campagne(r.campagne),
         "identification": identification(r),

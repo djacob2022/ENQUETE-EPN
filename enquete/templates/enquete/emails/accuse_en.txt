@@ -1,0 +1,14 @@
+Dear Sir or Madam,
+
+We acknowledge receipt of the answers from {{ reponse.epn.nom }} for “{{ campagne.nom }}”, submitted on {{ reponse.date_soumission|date:"j F Y \a\t H:i" }} by {{ reponse.repondant }}.
+
+You can view the summary here:
+{{ reponse.lien }}?langue=en
+
+Thank you for your contribution.
+
+Kind regards,
+{{ institution }}{% if signature %}
+{{ signature }}{% endif %}{% if assistance %}
+
+Support: {{ assistance }}{% endif %}
